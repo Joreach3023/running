@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan d'entraînement avec intervalles - Course 10 km</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+        .header {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        .button {
+            padding: 15px 30px;
+            font-size: 1.5em;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .button:hover {
+            background-color: #218838;
+        }
+        .program-container {
+            margin-top: 20px;
+            font-size: 1.2em;
+            max-width: 600px;
+        }
+        .week {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .goal {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+        .week-header {
+            font-weight: bold;
+            font-size: 1.3em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">Ton Programme d'Entraînement avec Intervalles</div>
+        <div class="program-container">
+            <div class="week">
+                <div class="week-header">Semaine 1 (27 mars - 2 avril)</div>
+                <p>Mardi: 5 km à 5:30/km + 3x30 secondes de sprint (avec 90 secondes de récupération entre chaque)</p>
+                <p>Jeudi: 6 km à 5:20/km + 4x30 secondes de sprint</p>
+                <p>Dimanche: 8 km à 5:40/km + 2x1 min de sprint</p>
+            </div>
+            <!-- Ajoute d'autres semaines ici -->
+        </div>
+        <button class="button" onclick="startTraining()">Démarrer l'entraînement</button>
+    </div>
+
+    <script>
+        const speechSynthesis = window.speechSynthesis;
+
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'fr-FR';
+            speechSynthesis.speak(utterance);
+        }
+
+        function startTraining() {
+            speak("Démarrage de l'entraînement. Cours à 5 minutes 30 par kilomètre.");
+            let minutesPassed = 0;
+            const interval = setInterval(() => {
+                minutesPassed++;
+                if (minutesPassed === 3) {
+                    speak("Va plus vite! Augmente ton rythme.");
+                } else if (minutesPassed === 6) {
+                    speak("Ralentis un peu.");
+                } else if (minutesPassed === 9) {
+                    speak("Encore 1 minute à ce rythme.");
+                }
+                if (minutesPassed >= 10) {
+                    clearInterval(interval);
+                    speak("Félicitations! Ton entraînement est terminé.");
+                }
+            }, 60000); // chaque minute
+        }
+    </script>
+</body>
+</html>

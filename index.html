@@ -1,105 +1,116 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plan d'entraînement avec intervalles - Course 10 km</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            color: #333;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            text-align: center;
-        }
-        .header {
-            font-size: 2em;
-            margin-bottom: 20px;
-        }
-        .button {
-            padding: 15px 30px;
-            font-size: 1.5em;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .button:hover {
-            background-color: #218838;
-        }
-        .program-container {
-            margin-top: 20px;
-            font-size: 1.2em;
-            max-width: 600px;
-        }
-        .week {
-            margin: 15px 0;
-            padding: 10px;
-            background-color: #e9ecef;
-            border-radius: 5px;
-        }
-        .goal {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #333;
-        }
-        .week-header {
-            font-weight: bold;
-            font-size: 1.3em;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">Ton Programme d'Entraînement avec Intervalles</div>
-        <div class="program-container">
-            <div class="week">
-                <div class="week-header">Semaine 1 (27 mars - 2 avril)</div>
-                <p>Mardi: 5 km à 5:30/km + 3x30 secondes de sprint (avec 90 secondes de récupération entre chaque)</p>
-                <p>Jeudi: 6 km à 5:20/km + 4x30 secondes de sprint</p>
-                <p>Dimanche: 8 km à 5:40/km + 2x1 min de sprint</p>
-            </div>
-            <!-- Ajoute d'autres semaines ici -->
+import React, { useState, useEffect } from 'react';
+import { Play, Pause, Volume2, BarChart2, Map } from 'lucide-react';
+
+export default function RunActiveScreen() {
+  const [isRunning, setIsRunning] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [currentDistance, setCurrentDistance] = useState(0);
+  const [currentPace, setCurrentPace] = useState(4.75); // en min/km
+  
+  // Simulation d'une course en cours
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isRunning) {
+        setCurrentTime(prev => prev + 1);
+        setCurrentDistance(prev => prev + 0.003);
+        setCurrentPace(prev => 4.5 + Math.sin(currentTime / 60) * 0.3);
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [isRunning, currentTime]);
+  
+  // Formatage du temps en hh:mm:ss
+  const formatTime = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Formatage du rythme en min:sec/km
+  const formatPace = (pace) => {
+    const mins = Math.floor(pace);
+    const secs = Math.floor((pace - mins) * 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}/km`;
+  };
+  
+  // Déterminer si le rythme est trop rapide, bon ou trop lent (par rapport à l'objectif de 4:30/km)
+  const getPaceStatus = () => {
+    if (currentPace < 4.42) return "too-fast"; // Plus rapide que 4:25/km
+    if (currentPace > 4.58) return "too-slow"; // Plus lent que 4:35/km
+    return "good"; // Entre 4:25 et 4:35/km
+  };
+  
+  const paceStatus = getPaceStatus();
+  
+  return (
+    <div className="flex flex-col h-screen bg-gray-100">
+      {/* En-tête */}
+      <header className="bg-blue-600 text-white p-4">
+        <h1 className="text-xl font-bold">Course en cours</h1>
+        <p className="text-sm">Séance : Intervalles 6×500m</p>
+      </header>
+      
+      {/* Informations principales */}
+      <div className="flex-1 flex flex-col p-4 space-y-6">
+        {/* Rythme actuel */}
+        <div className="flex flex-col items-center justify-center bg-white rounded-xl shadow-md p-6">
+          <span className="text-sm text-gray-500">Rythme actuel</span>
+          <div className={`text-4xl font-bold ${
+            paceStatus === "too-fast" ? "text-red-500" : 
+            paceStatus === "too-slow" ? "text-orange-500" : 
+            "text-green-500"
+          }`}>
+            {formatPace(currentPace)}
+          </div>
+          <div className="text-sm mt-2">
+            {paceStatus === "too-fast" && "Ralentissez ! Objectif : 4:30/km"}
+            {paceStatus === "too-slow" && "Accélérez ! Objectif : 4:30/km"}
+            {paceStatus === "good" && "Bon rythme, maintenez !"}
+          </div>
         </div>
-        <button class="button" onclick="startTraining()">Démarrer l'entraînement</button>
+        
+        {/* Statistiques */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center">
+            <span className="text-xs text-gray-500">Distance</span>
+            <span className="text-2xl font-semibold">{currentDistance.toFixed(2)} km</span>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center">
+            <span className="text-xs text-gray-500">Durée</span>
+            <span className="text-2xl font-semibold">{formatTime(currentTime)}</span>
+          </div>
+        </div>
+        
+        {/* Carte simulée */}
+        <div className="bg-white rounded-xl shadow-md p-2 flex-1 flex items-center justify-center">
+          <div className="bg-gray-200 w-full h-full rounded-lg flex items-center justify-center">
+            <Map size={48} className="text-gray-400" />
+            <span className="ml-2 text-gray-500">Carte de la course</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Contrôles */}
+      <footer className="bg-white p-4 shadow-inner">
+        <div className="flex items-center justify-between">
+          <button className="p-4 rounded-full bg-gray-100">
+            <Volume2 size={24} className="text-blue-600" />
+          </button>
+          
+          <button 
+            className={`p-6 rounded-full ${isRunning ? "bg-red-500" : "bg-green-500"}`}
+            onClick={() => setIsRunning(!isRunning)}
+          >
+            {isRunning ? <Pause size={32} className="text-white" /> : <Play size={32} className="text-white" />}
+          </button>
+          
+          <button className="p-4 rounded-full bg-gray-100">
+            <BarChart2 size={24} className="text-blue-600" />
+          </button>
+        </div>
+      </footer>
     </div>
-
-    <script>
-        const speechSynthesis = window.speechSynthesis;
-
-        function speak(text) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'fr-FR';
-            speechSynthesis.speak(utterance);
-        }
-
-        function startTraining() {
-            speak("Démarrage de l'entraînement. Cours à 5 minutes 30 par kilomètre.");
-            let minutesPassed = 0;
-            const interval = setInterval(() => {
-                minutesPassed++;
-                if (minutesPassed === 3) {
-                    speak("Va plus vite! Augmente ton rythme.");
-                } else if (minutesPassed === 6) {
-                    speak("Ralentis un peu.");
-                } else if (minutesPassed === 9) {
-                    speak("Encore 1 minute à ce rythme.");
-                }
-                if (minutesPassed >= 10) {
-                    clearInterval(interval);
-                    speak("Félicitations! Ton entraînement est terminé.");
-                }
-            }, 60000); // chaque minute
-        }
-    </script>
-</body>
-</html>
+  );
+}

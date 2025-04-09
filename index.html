@@ -5,10 +5,6 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     
-    <!-- Leaflet CSS et JS -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RunPacer - Votre Coach de Course</title>
@@ -574,26 +570,296 @@
             startRun();
         });
         
-        // Variables pour la simulation de course
-        let isRunning = false;
-        let runInterval;
-        let currentDistance = 0;
-        let currentDuration = 0;
-        let currentPaceSeconds = 300; // 5:00 min/km (300 secondes)
-        let targetPaceSeconds = 300; // 5:00 min/km par défaut
-        let speechSynthesis = window.speechSynthesis;
-        let lastSpokenTime = 0;
+        // Ajoutez ce code dans votre section script, en remplaçant les fonctions existantes liées à la simulation de course
+
+// Variables globales pour le GPS
+let watchId;
+let previousLocation;
+let locationData = [];
+let distanceTraveled = 0;
+let isTrackingLocation = false;
+let mapObject;
+
+// Initialiser la carte avec Leaflet (ajoutez le lien CDN dans le head)
+function initializeMap() {
+    // Vérifier si la carte est déjà initialisée
+    if (mapObject) return;
+    
+    const mapElement = document.getElementById('map');
+    
+    // Si Leaflet est disponible, initialiser la carte
+    if (typeof L !== 'undefined') {
+        mapObject = L.map('map').setView([48.8566, 2.3522], 15); // Paris par défaut
         
-        // Fonction pour démarrer la course
-        function startRun() {
-            isRunning = true;
-            currentDistance = 0;
-            currentDuration = 0;
-            targetPaceSeconds = 300; // 5:00 min/km pour la course facile
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(mapObject);
+        
+        // Créer un layer pour le parcours
+        window.routeLayer = L.layerGroup().addTo(mapObject);
+    } else {
+        // Fallback si Leaflet n'est pas disponible
+        mapElement.innerHTML = '<div style="background-color: #e0e0e0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"><i class="fas fa-map-marker-alt" style="font-size: 2rem; color: #3498db;"></i><span style="margin-left: 10px;">Carte non disponible</span></div>';
+    }
+}
+
+// Demander les permissions de localisation
+function requestLocationPermission() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject('La géolocalisation n\'est pas supportée par votre navigateur.');
+            return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+            position => resolve(position),
+            error => {
+                console.error('Erreur de géolocalisation:', error);
+                
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        reject('Vous avez refusé l\'accès à votre position.');
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        reject('Information de localisation non disponible.');
+                        break;
+                    case error.TIMEOUT:
+                        reject('Délai d\'attente dépassé pour obtenir la position.');
+                        break;
+                    case error.UNKNOWN_ERROR:
+                        reject('Une erreur inconnue s\'est produite.');
+                        break;
+                }
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    });
+}
+
+// Calculer la distance entre deux points GPS en mètres
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // Rayon de la Terre en mètres
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // en mètres
+}
+
+// Mettre à jour la carte avec les nouvelles coordonnées
+function updateMap(latitude, longitude) {
+    if (!mapObject || typeof L === 'undefined') return;
+    
+    // Centrer la carte sur la position actuelle
+    mapObject.setView([latitude, longitude], 16);
+    
+    // Ajouter un point au parcours
+    if (locationData.length > 1) {
+        const lastLocation = locationData[locationData.length - 2];
+        const routeLine = L.polyline(
+            [
+                [lastLocation.latitude, lastLocation.longitude],
+                [latitude, longitude]
+            ],
+            {color: 'blue', weight: 5}
+        );
+        window.routeLayer.addLayer(routeLine);
+    }
+    
+    // Ajouter un marqueur à la position actuelle (et supprimer l'ancien s'il existe)
+    if (window.currentPositionMarker) {
+        mapObject.removeLayer(window.currentPositionMarker);
+    }
+    window.currentPositionMarker = L.circleMarker([latitude, longitude], {
+        color: '#3498db',
+        fillColor: '#3498db',
+        fillOpacity: 1,
+        radius: 8
+    }).addTo(mapObject);
+}
+
+// Gérer les mises à jour de position
+function handleLocationUpdate(position) {
+    const { latitude, longitude, accuracy, speed } = position.coords;
+    const timestamp = position.timestamp;
+    
+    // Ajouter aux données de localisation
+    locationData.push({ latitude, longitude, accuracy, speed, timestamp });
+    
+    // Calculer la distance si ce n'est pas le premier point
+    if (previousLocation) {
+        const segmentDistance = calculateDistance(
+            previousLocation.latitude, previousLocation.longitude,
+            latitude, longitude
+        );
+        
+        // Filtrer les mauvaises lectures GPS (si la distance est trop grande en peu de temps)
+        const timeElapsed = (timestamp - previousLocation.timestamp) / 1000; // en secondes
+        const speedMps = segmentDistance / timeElapsed;
+        
+        // Ignorer les points aberrants (vitesse > 10 m/s ou 36 km/h)
+        if (segmentDistance > 1 && speedMps < 10) {
+            distanceTraveled += segmentDistance;
             
-            document.getElementById('target-pace').textContent = "5:00";
+            // Mettre à jour l'affichage
+            document.getElementById('distance').textContent = (distanceTraveled / 1000).toFixed(2);
             
-            // Initialiser la voix
+            // Calculer le rythme actuel en min/km
+            let currentPaceSeconds;
+            if (speed && speed > 0) {
+                // Utiliser la vitesse du GPS si disponible (en m/s)
+                currentPaceSeconds = (1000 / speed) / 60; // Convertir en min/km
+            } else {
+                // Calculer à partir de la distance et du temps
+                const currentSpeed = segmentDistance / timeElapsed; // m/s
+                if (currentSpeed > 0) {
+                    currentPaceSeconds = (1000 / currentSpeed) / 60; // min/km
+                } else {
+                    currentPaceSeconds = 0;
+                }
+            }
+            
+            // Mettre à jour l'affichage du rythme
+            if (currentPaceSeconds > 0) {
+                const paceMinutes = Math.floor(currentPaceSeconds);
+                const paceSeconds = Math.floor((currentPaceSeconds - paceMinutes) * 60);
+                document.getElementById('current-pace').textContent = 
+                    `${paceMinutes}:${paceSeconds.toString().padStart(2, '0')}`;
+                
+                // Feedback sur le rythme
+                updatePaceFeedback(currentPaceSeconds * 60); // Convertir en secondes
+            }
+            
+            // Mettre à jour la carte
+            updateMap(latitude, longitude);
+        }
+    } else {
+        // Premier point, initialiser la carte
+        updateMap(latitude, longitude);
+    }
+    
+    previousLocation = { latitude, longitude, timestamp };
+}
+
+// Démarrer le suivi GPS
+function startGpsTracking() {
+    if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+            handleLocationUpdate,
+            error => {
+                console.error('Erreur de géolocalisation:', error);
+                alert(`Erreur GPS: ${error.message}`);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+        isTrackingLocation = true;
+    } else {
+        alert('La géolocalisation n\'est pas supportée par votre navigateur.');
+    }
+}
+
+// Arrêter le suivi GPS
+function stopGpsTracking() {
+    if (watchId !== undefined) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = undefined;
+        isTrackingLocation = false;
+    }
+}
+
+// Mettre à jour le feedback de rythme
+function updatePaceFeedback(currentPaceSeconds) {
+    const targetPaceSeconds = paceToSeconds(document.getElementById('target-pace').textContent);
+    const paceFeedback = document.getElementById('pace-feedback');
+    
+    if (currentPaceSeconds < targetPaceSeconds - 15) {
+        paceFeedback.textContent = "Ralentissez un peu!";
+        paceFeedback.className = "too-fast";
+        
+        // Instruction vocale si nécessaire
+        if (userData.voiceEnabled && currentDuration - lastSpokenTime > 30) {
+            const utterance = new SpeechSynthesisUtterance("Ralentissez un peu, vous êtes trop rapide.");
+            utterance.lang = 'fr-FR';
+            speechSynthesis.speak(utterance);
+            lastSpokenTime = currentDuration;
+            
+            // Afficher l'indicateur vocal
+            document.getElementById('voice-indicator').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('voice-indicator').classList.add('hidden');
+            }, 3000);
+        }
+    } else if (currentPaceSeconds > targetPaceSeconds + 15) {
+        paceFeedback.textContent = "Accélérez un peu!";
+        paceFeedback.className = "too-slow";
+        
+        // Instruction vocale si nécessaire
+        if (userData.voiceEnabled && currentDuration - lastSpokenTime > 30) {
+            const utterance = new SpeechSynthesisUtterance("Accélérez un peu, vous êtes trop lent.");
+            utterance.lang = 'fr-FR';
+            speechSynthesis.speak(utterance);
+            lastSpokenTime = currentDuration;
+            
+            // Afficher l'indicateur vocal
+            document.getElementById('voice-indicator').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('voice-indicator').classList.add('hidden');
+            }, 3000);
+        }
+    } else {
+        paceFeedback.textContent = "Bon rythme, continuez!";
+        paceFeedback.className = "good-pace";
+    }
+}
+
+// Fonction pour démarrer la course avec GPS
+function startRun() {
+    // Réinitialiser les variables
+    isRunning = true;
+    currentDistance = 0;
+    currentDuration = 0;
+    distanceTraveled = 0;
+    locationData = [];
+    previousLocation = null;
+    targetPaceSeconds = 300; // 5:00 min/km pour la course facile
+    
+    // Initialiser la carte
+    initializeMap();
+    
+    // Nettoyer le parcours précédent sur la carte
+    if (window.routeLayer) {
+        window.routeLayer.clearLayers();
+    }
+    
+    document.getElementById('target-pace').textContent = "5:00";
+    document.getElementById('current-pace').textContent = "--:--";
+    document.getElementById('distance').textContent = "0.00";
+    document.getElementById('duration').textContent = "00:00";
+    
+    // Demander la permission et démarrer le suivi GPS
+    requestLocationPermission()
+        .then(() => {
+            // Démarrer le chrono
+            runInterval = setInterval(updateRunningTime, 1000);
+            
+            // Démarrer le GPS
+            startGpsTracking();
+            
+            // Instruction vocale
             if (userData.voiceEnabled) {
                 const utterance = new SpeechSynthesisUtterance("Début de la course. Objectif: 5 minutes par kilomètre.");
                 utterance.lang = 'fr-FR';
@@ -606,277 +872,147 @@
                 }, 3000);
             }
             
-            // Simuler la géolocalisation
-            if (navigator.geolocation) {
-                // En situation réelle, nous utiliserions watchPosition
-                console.log("Géolocalisation disponible");
-            }
-            
-            // Démarer le chronomètre et la mise à jour de l'interface
-            runInterval = setInterval(updateRunningStats, 1000);
-            
             // Mettre à jour l'affichage des boutons
             document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i> Pause';
             document.getElementById('pause-btn').onclick = pauseRun;
-        }
-        
-        // Fonction pour mettre à jour les statistiques de course
-        function updateRunningStats() {
-            currentDuration++;
-            
-            // Simuler une variation de rythme (en situation réelle, calculé via GPS)
-            const variation = Math.sin(currentDuration / 60) * 20;
-            currentPaceSeconds = targetPaceSeconds + variation;
-            
-            // Calculer la distance parcourue
-            const kmPerSecond = 1 / currentPaceSeconds;
-            currentDistance += kmPerSecond;
-            
-            // Mettre à jour l'affichage
-            document.getElementById('current-pace').textContent = secondsToPace(currentPaceSeconds);
-            document.getElementById('distance').textContent = currentDistance.toFixed(2);
-            document.getElementById('duration').textContent = formatTime(currentDuration);
-            
-            // Feedback sur le rythme
-            const paceFeedback = document.getElementById('pace-feedback');
-            
-            if (currentPaceSeconds < targetPaceSeconds - 15) {
-                paceFeedback.textContent = "Ralentissez un peu!";
-                paceFeedback.className = "too-fast";
-                
-                // Instruction vocale si nécessaire
-                if (userData.voiceEnabled && currentDuration - lastSpokenTime > 30) {
-                    const utterance = new SpeechSynthesisUtterance("Ralentissez un peu, vous êtes trop rapide.");
-                    utterance.lang = 'fr-FR';
-                    speechSynthesis.speak(utterance);
-                    lastSpokenTime = currentDuration;
-                    
-                    // Afficher l'indicateur vocal
-                    document.getElementById('voice-indicator').classList.remove('hidden');
-                    setTimeout(() => {
-                        document.getElementById('voice-indicator').classList.add('hidden');
-                    }, 3000);
-                }
-            } else if (currentPaceSeconds > targetPaceSeconds + 15) {
-                paceFeedback.textContent = "Accélérez un peu!";
-                paceFeedback.className = "too-slow";
-                
-                // Instruction vocale si nécessaire
-                if (userData.voiceEnabled && currentDuration - lastSpokenTime > 30) {
-                    const utterance = new SpeechSynthesisUtterance("Accélérez un peu, vous êtes trop lent.");
-                    utterance.lang = 'fr-FR';
-                    speechSynthesis.speak(utterance);
-                    lastSpokenTime = currentDuration;
-                    
-                    // Afficher l'indicateur vocal
-                    document.getElementById('voice-indicator').classList.remove('hidden');
-                    setTimeout(() => {
-                        document.getElementById('voice-indicator').classList.add('hidden');
-                    }, 3000);
-                }
-            } else {
-                paceFeedback.textContent = "Bon rythme, continuez!";
-                paceFeedback.className = "good-pace";
-            }
-            
-            // Annonce de distance tous les kilomètres
-            if (currentDistance % 1 < 0.01 && currentDistance > 0.1) {
-                if (userData.voiceEnabled) {
-                    const km = Math.floor(currentDistance);
-                    const utterance = new SpeechSynthesisUtterance(`${km} kilomètre${km > 1 ? 's' : ''} parcouru${km > 1 ? 's' : ''}`);
-                    utterance.lang = 'fr-FR';
-                    speechSynthesis.speak(utterance);
-                    
-                    // Afficher l'indicateur vocal
-                    document.getElementById('voice-indicator').classList.remove('hidden');
-                    setTimeout(() => {
-                        document.getElementById('voice-indicator').classList.add('hidden');
-                    }, 3000);
-                }
-            }
-        }
-        
-        // Fonction pour mettre en pause la course
-        function pauseRun() {
-            isRunning = false;
-            clearInterval(runInterval);
-            
-            // Mettre à jour l'affichage des boutons
-            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i> Reprendre';
-            document.getElementById('pause-btn').onclick = resumeRun;
-            
-            // Instruction vocale
-            if (userData.voiceEnabled) {
-                const utterance = new SpeechSynthesisUtterance("Course en pause");
-                utterance.lang = 'fr-FR';
-                speechSynthesis.speak(utterance);
-                
-                // Afficher l'indicateur vocal
-                document.getElementById('voice-indicator').classList.remove('hidden');
-                setTimeout(() => {
-                    document.getElementById('voice-indicator').classList.add('hidden');
-                }, 3000);
-            }
-        }
-        
-        // Fonction pour reprendre la course
-        function resumeRun() {
-            isRunning = true;
-            runInterval = setInterval(updateRunningStats, 1000);
-            
-            // Mettre à jour l'affichage des boutons
-            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i> Pause';
-            document.getElementById('pause-btn').onclick = pauseRun;
-            
-            // Instruction vocale
-            if (userData.voiceEnabled) {
-                const utterance = new SpeechSynthesisUtterance("Reprise de la course");
-                utterance.lang = 'fr-FR';
-                speechSynthesis.speak(utterance);
-                
-                // Afficher l'indicateur vocal
-                document.getElementById('voice-indicator').classList.remove('hidden');
-                setTimeout(() => {
-                    document.getElementById('voice-indicator').classList.add('hidden');
-                }, 3000);
-            }
-        }
-        
-        // Fonction pour arrêter la course
-        document.getElementById('stop-btn').addEventListener('click', function() {
-            if (isRunning || document.getElementById('pause-btn').innerHTML.includes('Reprendre')) {
-                clearInterval(runInterval);
-                
-                // Instruction vocale
-                if (userData.voiceEnabled) {
-                    const utterance = new SpeechSynthesisUtterance("Fin de la course");
-                    utterance.lang = 'fr-FR';
-                    speechSynthesis.speak(utterance);
-                    
-                    // Afficher l'indicateur vocal
-                    document.getElementById('voice-indicator').classList.remove('hidden');
-                    setTimeout(() => {
-                        document.getElementById('voice-indicator').classList.add('hidden');
-                    }, 3000);
-                }
-                
-                // Sauvegarder la course
-                const newRun = {
-                    date: new Date().toISOString().split('T')[0],
-                    type: 'Course facile',
-                    distance: currentDistance.toFixed(2),
-                    pace: secondsToPace(currentPaceSeconds),
-                    duration: currentDuration
-                };
-                
-                userData.runs.unshift(newRun); // Ajouter au début de l'historique
-                
-                // Mise à jour des statistiques
-                updateHistory();
-                
-                // Redirection vers la section des statistiques
-                sections.forEach(s => {
-                    document.getElementById(`nav-${s}`).classList.remove('active');
-                    document.getElementById(`${s}-section`).classList.remove('active');
-                });
-                
-                document.getElementById('nav-stats').classList.add('active');
-                document.getElementById('stats-section').classList.add('active');
-                
-                // Réinitialiser l'interface de course
-                isRunning = false;
-                currentDistance = 0;
-                currentDuration = 0;
-                document.getElementById('current-pace').textContent = "--:--";
-                document.getElementById('distance').textContent = "0.00";
-                document.getElementById('duration').textContent = "00:00";
-            }
+        })
+        .catch(error => {
+            alert(`Impossible de démarrer le suivi GPS: ${error}`);
+            console.error(error);
         });
-        
-        // Mise à jour de l'historique des courses
-        function updateHistory() {
-            const historyTable = document.getElementById('history-table');
-            historyTable.innerHTML = '';
-            
-            // Ajouter les 5 dernières courses
-            const recentRuns = userData.runs.slice(0, 5);
-            
-            recentRuns.forEach(run => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${run.date}</td>
-                    <td>${run.type}</td>
+}
 
-                    <td>${run.distance} km</td>
-                    <td>${run.pace}</td>
-                `;
-                historyTable.appendChild(row);
-            });
+// Mettre à jour uniquement le temps qui s'écoule
+function updateRunningTime() {
+    currentDuration++;
+    document.getElementById('duration').textContent = formatTime(currentDuration);
+    
+    // Annoncer la distance tous les kilomètres
+    const currentDistanceKm = distanceTraveled / 1000;
+    if (Math.floor(currentDistanceKm) > Math.floor((distanceTraveled - 10) / 1000) && currentDistanceKm > 0.1) {
+        const km = Math.floor(currentDistanceKm);
+        if (userData.voiceEnabled) {
+            const utterance = new SpeechSynthesisUtterance(`${km} kilomètre${km > 1 ? 's' : ''} parcouru${km > 1 ? 's' : ''}`);
+            utterance.lang = 'fr-FR';
+            speechSynthesis.speak(utterance);
+            
+            // Afficher l'indicateur vocal
+            document.getElementById('voice-indicator').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('voice-indicator').classList.add('hidden');
+            }, 3000);
+        }
+    }
+}
+
+// Fonction pour mettre en pause la course
+function pauseRun() {
+    isRunning = false;
+    clearInterval(runInterval);
+    stopGpsTracking();
+    
+    // Mettre à jour l'affichage des boutons
+    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i> Reprendre';
+    document.getElementById('pause-btn').onclick = resumeRun;
+    
+    // Instruction vocale
+    if (userData.voiceEnabled) {
+        const utterance = new SpeechSynthesisUtterance("Course en pause");
+        utterance.lang = 'fr-FR';
+        speechSynthesis.speak(utterance);
+        
+        // Afficher l'indicateur vocal
+        document.getElementById('voice-indicator').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('voice-indicator').classList.add('hidden');
+        }, 3000);
+    }
+}
+
+// Fonction pour reprendre la course
+function resumeRun() {
+    isRunning = true;
+    runInterval = setInterval(updateRunningTime, 1000);
+    startGpsTracking();
+    
+    // Mettre à jour l'affichage des boutons
+    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i> Pause';
+    document.getElementById('pause-btn').onclick = pauseRun;
+    
+    // Instruction vocale
+    if (userData.voiceEnabled) {
+        const utterance = new SpeechSynthesisUtterance("Reprise de la course");
+        utterance.lang = 'fr-FR';
+        speechSynthesis.speak(utterance);
+        
+        // Afficher l'indicateur vocal
+        document.getElementById('voice-indicator').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('voice-indicator').classList.add('hidden');
+        }, 3000);
+    }
+}
+
+// Fonction pour arrêter la course (à remplacer dans votre code)
+document.getElementById('stop-btn').addEventListener('click', function() {
+    if (isRunning || document.getElementById('pause-btn').innerHTML.includes('Reprendre')) {
+        clearInterval(runInterval);
+        stopGpsTracking();
+        
+        // Calculer le rythme moyen
+        let avgPace = "--:--";
+        if (distanceTraveled > 0 && currentDuration > 0) {
+            const paceSeconds = (currentDuration / (distanceTraveled / 1000));
+            const paceMinutes = Math.floor(paceSeconds / 60);
+            const paceRemainingSeconds = Math.floor(paceSeconds % 60);
+            avgPace = `${paceMinutes}:${paceRemainingSeconds.toString().padStart(2, '0')}`;
         }
         
-        // Gestion du formulaire de profil
-        document.getElementById('profile-form').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // Instruction vocale
+        if (userData.voiceEnabled) {
+            const utterance = new SpeechSynthesisUtterance("Fin de la course");
+            utterance.lang = 'fr-FR';
+            speechSynthesis.speak(utterance);
             
-            // Récupérer les valeurs du formulaire
-            userData.currentPace = document.getElementById('current-pace-input').value;
-            userData.targetPace = document.getElementById('target-pace-input').value;
-            userData.eventDate = document.getElementById('event-date-input').value;
-            
-            // Jours d'entraînement
-            userData.trainingDays = [];
-            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-            days.forEach(day => {
-                if (document.getElementById(day).checked) {
-                    userData.trainingDays.push(day);
-                }
-            });
-            
-            // Instructions vocales
-            userData.voiceEnabled = document.getElementById('voice-enabled').checked;
-            
-            // Enregistrer dans le stockage local
-            localStorage.setItem('runPacerUserData', JSON.stringify(userData));
-            
-            // Générer un nouveau plan d'entraînement
-            generateTrainingPlan();
-            
-            // Notification
-            alert("Profil enregistré! Le plan d'entraînement a été mis à jour.");
-            
-            // Redirection vers la section plan
-            sections.forEach(s => {
-                document.getElementById(`nav-${s}`).classList.remove('active');
-                document.getElementById(`${s}-section`).classList.remove('active');
-            });
-            
-            document.getElementById('nav-plan').classList.add('active');
-            document.getElementById('plan-section').classList.add('active');
+            // Afficher l'indicateur vocal
+            document.getElementById('voice-indicator').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('voice-indicator').classList.add('hidden');
+            }, 3000);
+        }
+        
+        // Sauvegarder la course
+        const newRun = {
+            date: new Date().toISOString().split('T')[0],
+            type: 'Course facile',
+            distance: (distanceTraveled / 1000).toFixed(2),
+            pace: avgPace,
+            duration: currentDuration,
+            gpsData: locationData // Stocker les données GPS pour référence future
+        };
+        
+        userData.runs.unshift(newRun); // Ajouter au début de l'historique
+        
+        // Mise à jour des statistiques
+        updateHistory();
+        
+        // Redirection vers la section des statistiques
+        sections.forEach(s => {
+            document.getElementById(`nav-${s}`).classList.remove('active');
+            document.getElementById(`${s}-section`).classList.remove('active');
         });
         
-        // Fonction pour générer un plan d'entraînement
-        function generateTrainingPlan() {
-            // Dans une version réelle, cette fonction serait plus complexe
-            // et prendrait en compte le niveau actuel, l'objectif et la date de l'événement
-            
-            // Calculer le nombre de semaines jusqu'à l'événement
-            const today = new Date();
-            const eventDate = new Date(userData.eventDate);
-            const timeUntilEvent = eventDate - today;
-            const weeksUntilEvent = Math.ceil(timeUntilEvent / (7 * 24 * 60 * 60 * 1000));
-            
-            console.log(`Il reste ${weeksUntilEvent} semaines jusqu'à l'événement`);
-            
-            // Mise à jour de l'interface avec les informations
-            document.querySelector('#plan-section .card:first-child').innerHTML = `
-                <div class="card-title">Votre objectif</div>
-                <p>Course 10km: <strong>${userData.eventDate}</strong></p>
-                <p>Objectif rythme: <strong>${userData.targetPace} min/km</strong></p>
-                <p>Niveau actuel: <strong>${userData.currentPace} min/km</strong></p>
-                <p>Jours d'entraînement: <strong>${userData.trainingDays.map(day => day.charAt(0).toUpperCase() + day.slice(1)).join(', ')}</strong></p>
-                <p>Semaines restantes: <strong>${weeksUntilEvent}</strong></p>
-            `;
-        }
+        document.getElementById('nav-stats').classList.add('active');
+        document.getElementById('stats-section').classList.add('active');
+        
+        // Réinitialiser l'interface de course
+        isRunning = false;
+        document.getElementById('current-pace').textContent = "--:--";
+        document.getElementById('distance').textContent = "0.00";
+        document.getElementById('duration').textContent = "00:00";
+    }
+});
+
         
         // Charger les données utilisateur depuis le stockage local au démarrage
         window.addEventListener('DOMContentLoaded', function() {
@@ -933,6 +1069,21 @@
                     });
             });
         }
+
+        
+// Ajouter pendant le chargement initial de la page
+window.addEventListener('DOMContentLoaded', function() {
+    // Votre code existant...
+    
+    // Vérifier la disponibilité du GPS
+    if ('geolocation' in navigator) {
+        console.log("Géolocalisation disponible");
+    } else {
+        console.log("Géolocalisation non disponible");
+        alert("Votre appareil ne prend pas en charge la géolocalisation. Certaines fonctionnalités ne seront pas disponibles.");
+    }
+});
+        
     </script>
 </body>
 </html>

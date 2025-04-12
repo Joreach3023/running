@@ -1483,9 +1483,12 @@ function handleLocationUpdate(position) {
                         
                         // Instruction vocale pour le kilomètre parcouru
                         if (userData.voiceEnabled) {
-                            const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} en ${kmPace}`);
-                            utterance.lang = 'fr-FR';
-                            speechSynthesis.speak(utterance);
+    const [minutes, seconds] = kmPace.split(':');
+    const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} en ${minutes} minutes et ${seconds} secondes`);
+    utterance.lang = 'fr-FR';
+    speechSynthesis.speak(utterance);
+}
+
                             
                             // Afficher l'indicateur vocal
                             document.getElementById('voice-indicator').classList.remove('hidden');

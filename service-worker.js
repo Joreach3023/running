@@ -1,13 +1,15 @@
 // Nom du cache
-const CACHE_NAME = 'runpacer-cache-v1';
+const CACHE_NAME = 'runpacer-cache-v2';
 
 // Fichiers à mettre en cache
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/css/styles.css',
+  '/js/app.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/webfonts/fa-solid-900.woff2'
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/webfonts/fa-solid-900.woff2',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
@@ -34,6 +36,13 @@ self.addEventListener('fetch', function(event) {
         if (response) {
           return response;
         }
+        
+        // Pour les requêtes de tuiles de carte (OpenStreetMap), essayer de récupérer en ligne
+        // mais ne pas mettre en cache (pour éviter de remplir le stockage)
+        if (event.request.url.includes('tile.openstreetmap.org')) {
+          return fetch(event.request);
+        }
+        
         return fetch(event.request).then(
           function(response) {
             // Vérifier si nous avons reçu une réponse valide
@@ -64,6 +73,7 @@ self.addEventListener('activate', function(event) {
       return Promise.all(
         cacheNames.map(function(cacheName) {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Suppression de l\'ancien cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -71,3 +81,23 @@ self.addEventListener('activate', function(event) {
     })
   );
 });
+
+// Gestion des synchronisations en arrière-plan
+self.addEventListener('sync', function(event) {
+  if (event.tag === 'sync-runs') {
+    event.waitUntil(syncRuns());
+  }
+});
+
+// Fonction pour synchroniser les courses en arrière-plan
+function syncRuns() {
+  // Ici, vous pourriez implémenter une logique pour envoyer les courses
+  // stockées en local vers un serveur distant
+  console.log('Synchronisation des courses en arrière-plan');
+  
+  // Exemple de notification après synchronisation
+  self.registration.showNotification('RunPacer', {
+    body: 'Vos courses ont été synchronisées',
+    icon: '/icons/icon-192x192.png'
+  });
+}

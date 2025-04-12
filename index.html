@@ -382,6 +382,93 @@
             z-index: 1000;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
+        /* Styles pour la page de détail des courses */
+.map-icon {
+    background: none !important;
+    border: none;
+}
+
+.km-marker {
+    background: none !important;
+    border: none;
+}
+
+/* Animation pour les transitions de page */
+.section {
+    transition: opacity 0.3s ease;
+}
+
+/* Styles pour le graphique d'allure */
+.pace-chart-bar {
+    transition: height 0.5s ease;
+}
+
+/* Styles pour les courses dans la liste d'historique */
+#history-table tr {
+    transition: background-color 0.2s ease;
+}
+
+#history-table tr:hover {
+    background-color: rgba(52, 152, 219, 0.1);
+}
+
+/* Styles pour les statistiques d'élévation */
+.elevation-chart {
+    width: 100%;
+    height: 100px;
+    background: linear-gradient(to bottom, #ecf0f1 0%, #ecf0f1 70%, #3498db 70%, #3498db 100%);
+    position: relative;
+    overflow: hidden;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.elevation-point {
+    position: absolute;
+    bottom: 0;
+    width: 2px;
+    background-color: rgba(52, 152, 219, 0.3);
+}
+
+/* Indicateur de qualité GPS */
+.gps-quality {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    font-size: 1.2rem;
+}
+
+.gps-good {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.gps-medium {
+    background-color: #f39c12;
+    color: white;
+}
+
+.gps-poor {
+    background-color: var(--warning-color);
+    color: white;
+}
+
+/* Animation de chargement pour les cartes */
+.map-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }  
     </style>
 </head>
 <body>

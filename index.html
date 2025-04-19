@@ -1577,8 +1577,8 @@ function handleLocationUpdate(position) {
                 paceFeedback.className = "too-fast";
                 
                 // Instruction vocale si nécessaire
-                if (userData.voiceEnabled && currentDuration - lastSpokenTime > 30) {
-                    const utterance = new SpeechSynthesisUtterance("Ralentissez un peu, vous êtes trop rapide.");
+                if (userData.voiceEnabled && currentDuration - lastSpokenTime > 60) {
+                    const utterance = new SpeechSynthesisUtterance("Ralentissez un peu, vous êtes trop puissant et rapide. Unlimited power.");
                     utterance.lang = 'fr-FR';
                     speechSynthesis.speak(utterance);
                     lastSpokenTime = currentDuration;
@@ -1594,8 +1594,8 @@ function handleLocationUpdate(position) {
                 paceFeedback.className = "too-slow";
                 
                 // Instruction vocale si nécessaire
-                if (userData.voiceEnabled && currentDuration - lastSpokenTime > 30) {
-                    const utterance = new SpeechSynthesisUtterance("Accélérez un peu, vous êtes trop lent.");
+                if (userData.voiceEnabled && currentDuration - lastSpokenTime > 60) {
+                    const utterance = new SpeechSynthesisUtterance("Accélérez fénéasse, vous êtes trop lent.");
                     utterance.lang = 'fr-FR';
                     speechSynthesis.speak(utterance);
                     lastSpokenTime = currentDuration;

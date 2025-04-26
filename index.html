@@ -1762,7 +1762,8 @@
                 
                 if (currentKm > 0 && currentKm > Math.floor((simulatedDistance - 100) / 1000)) {
                     if (userData.voiceEnabled) {
-                        const utterance = new SpeechSynthesisUtterance(`${currentKm} kilomètre${currentKm > 1 ? 's' : ''} simulé${currentKm > 1 ? 's' : ''}`);
+                        const pace = secondsToPace(currentDuration / currentKm);
+const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} simulé en ${pace}`);
                         utterance.lang = 'fr-FR';
                         speechSynthesis.speak(utterance);
                         
@@ -1844,7 +1845,7 @@
                 
                 // Instruction vocale
                 if (userData.voiceEnabled) {
-                    const utterance = new SpeechSynthesisUtterance(`Fin de la course. Rythme moyen: ${avgPace} minutes par kilomètre.`);
+                    const utterance = new SpeechSynthesisUtterance(`Fin de la course. Rythme moyen: ${avgPace} par kilomètre.`);
                     utterance.lang = 'fr-FR';
                     speechSynthesis.speak(utterance);
                     

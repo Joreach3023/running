@@ -578,6 +578,11 @@
                 <div class="big-metric" id="current-pace">--:--</div>
                 <div id="pace-feedback" class="good-pace">Prêt à commencer</div>
             </div>
+
+            <div id="interval-indicator" class="hidden" style="text-align: center; margin: 10px 0; font-weight: bold;">
+    <span id="interval-phase">Intervalle rapide</span>
+    <span id="interval-distance" style="display: block; font-size: 0.8em;"></span>
+</div>
             
             <div class="metrics-row">
                 <div class="metric-box">
@@ -858,34 +863,45 @@
         let currentKmStartTime = 0;
         let currentKmStartDistance = 0;
         let currentRouteImage = null;
+        // Ajouter ces variables en haut avec les autres :
+let intervalPhase = 'work'; // 'work' ou 'recovery'
+let intervalDistanceRemaining = 0;
+let currentTargetPace = "5:00"; // Valeur par défaut
         
-        // Types de course et leurs paramètres
-        const runTypes = {
-            easy: {
-                name: "Course facile",
-                description: "Récupération active, travail cardiovasculaire léger",
-                paceOffset: 1.0, // +1 min/km par rapport au rythme actuel
-                distance: 5
-            },
-            interval: {
-                name: "Intervalles",
-                description: "Travail de vitesse avec périodes de récupération",
-                paceOffset: -0.25, // -15 sec/km par rapport au rythme actuel
-                distance: 6
-            },
-            long: {
-                name: "Longue sortie",
-                description: "Développement de l'endurance fondamentale",
-                paceOffset: 0.75, // +45 sec/km par rapport au rythme actuel
-                distance: 8
-            },
-            tempo: {
-                name: "Course tempo",
-                description: "Allure soutenue proche du seuil anaérobie",
-                paceOffset: -0.5, // -30 sec/km par rapport au rythme actuel
-                distance: 5
-            }
-        };
+       
+const runTypes = {
+    easy: {
+        name: "Course facile",
+        description: "Récupération active, travail cardiovasculaire léger",
+        paceOffset: 1.0, // +1 min/km par rapport au rythme actuel
+        distance: 5,
+        isInterval: false
+    },
+    interval: {
+        name: "Intervalles",
+        description: "Alternance de courses rapides et de récupération",
+        paceOffset: -0.25, // -15 sec/km pour les portions rapides
+        recoveryPaceOffset: 1.5, // +1:30 min/km pour la récupération
+        distance: 6,
+        intervalDuration: 400, // durée de chaque intervalle en mètres
+        recoveryDuration: 200, // durée de récupération en mètres
+        isInterval: true
+    },
+    long: {
+        name: "Longue sortie",
+        description: "Développement de l'endurance fondamentale",
+        paceOffset: 0.75, // +45 sec/km par rapport au rythme actuel
+        distance: 8,
+        isInterval: false
+    },
+    tempo: {
+        name: "Course tempo",
+        description: "Allure soutenue proche du seuil anaérobie",
+        paceOffset: -0.5, // -30 sec/km par rapport au rythme actuel
+        distance: 5,
+        isInterval: false
+    }
+};
         
         // Conversion de pace (min:sec) en secondes
         function paceToSeconds(pace) {
@@ -1544,7 +1560,57 @@
                 
                 // Ignorer les points aberrants (vitesse > 10 m/s ou 36 km/h)
                 if (segmentDistance > 1 && speedMps < 10) {
-                    distanceTraveled += segmentDistance;
+        distanceTraveled += segmentDistance;
+        
+        // Gestion spécifique des intervalles
+        if (runTypes[currentRunType].isInterval) {
+            intervalDistanceRemaining -= segmentDistance;
+            
+            // Vérifier si on doit changer de phase
+            if (intervalDistanceRemaining <= 0) {
+                if (intervalPhase === 'work') {
+                    intervalPhase = 'recovery';
+                    intervalDistanceRemaining = runTypes[currentRunType].recoveryDuration;
+                    currentTargetPace = secondsToPace(paceToSeconds(userData.currentPace) + 
+                                       runTypes[currentRunType].recoveryPaceOffset * 60);
+                    
+                    // Annonce vocale
+                    if (userData.voiceEnabled) {
+                        const utterance = new SpeechSynthesisUtterance("Récupération");
+                        utterance.lang = 'fr-FR';
+                        speechSynthesis.speak(utterance);
+                    }
+                } else {
+                    intervalPhase = 'work';
+                    intervalDistanceRemaining = runTypes[currentRunType].intervalDuration;
+                    currentTargetPace = secondsToPace(paceToSeconds(userData.currentPace) + 
+                                       runTypes[currentRunType].paceOffset * 60);
+                    
+                    // Annonce vocale
+                    if (userData.voiceEnabled) {
+                        const utterance = new SpeechSynthesisUtterance("Intervalle rapide");
+                        utterance.lang = 'fr-FR';
+                        speechSynthesis.speak(utterance);
+                    }
+                }
+            }
+
+            // Ajouter ce code pour mettre à jour l'indicateur :
+function updateIntervalIndicator() {
+    if (runTypes[currentRunType].isInterval) {
+        document.getElementById('interval-indicator').classList.remove('hidden');
+        document.getElementById('interval-phase').textContent = 
+            intervalPhase === 'work' ? 'Intervalle rapide' : 'Récupération';
+        document.getElementById('interval-distance').textContent = 
+            `Distance restante: ${Math.round(intervalDistanceRemaining)} m`;
+    } else {
+        document.getElementById('interval-indicator').classList.add('hidden');
+    }
+}
+               // Mettre à jour l'affichage du rythme cible
+            document.getElementById('target-pace').textContent = currentTargetPace;
+        }
+            
                     
                     // Vérifier si un nouveau kilomètre a été parcouru
                     const currentKm = Math.floor(distanceTraveled / 1000);
@@ -1653,8 +1719,8 @@
         
         // Mettre à jour le feedback de rythme
         function updatePaceFeedback(currentPaceSeconds) {
-            const targetPaceSeconds = paceToSeconds(document.getElementById('target-pace').textContent);
-            const paceFeedback = document.getElementById('pace-feedback');
+    const targetPaceSeconds = paceToSeconds(currentTargetPace);
+    const paceFeedback = document.getElementById('pace-feedback');
             
             if (currentPaceSeconds < targetPaceSeconds - 15) {
                 paceFeedback.textContent = "Ralentissez un peu!";
@@ -1708,6 +1774,23 @@
             currentKmStartTime = 0;
             currentKmStartDistance = 0;
             currentRouteImage = null;
+
+            // Initialiser les intervalles si nécessaire
+    if (runTypes[currentRunType].isInterval) {
+        intervalPhase = 'work';
+        intervalDistanceRemaining = runTypes[currentRunType].intervalDuration;
+        const currentPaceSeconds = paceToSeconds(userData.currentPace);
+        currentTargetPace = secondsToPace(currentPaceSeconds + 
+                           runTypes[currentRunType].paceOffset * 60);
+        document.getElementById('target-pace').textContent = currentTargetPace;
+        
+        // Première annonce
+        if (userData.voiceEnabled) {
+            const utterance = new SpeechSynthesisUtterance("Début des intervalles. Premier intervalle rapide.");
+            utterance.lang = 'fr-FR';
+            speechSynthesis.speak(utterance);
+        }
+    }
             
             // Initialiser la carte
             initializeMap();

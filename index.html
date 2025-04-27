@@ -443,6 +443,20 @@
 #generated-plan-table th {
     white-space: nowrap;
 }
+
+        .selected-session {
+    background-color: rgba(52, 152, 219, 0.2) !important;
+    border-left: 3px solid var(--primary-color);
+}
+
+#full-plan-table tr.selected-session td {
+    font-weight: bold;
+}
+
+        #full-plan-table tr:not(:first-child):hover {
+    background-color: rgba(52, 152, 219, 0.1);
+    transition: background-color 0.2s ease;
+}
         
         /* Styles pour les statistiques d'élévation */
         .elevation-chart {
@@ -1379,28 +1393,66 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
         
         // Mettre à jour l'affichage du plan d'entraînement
         function updateTrainingPlanDisplay() {
-            const tbody = document.getElementById('full-plan-body');
-            tbody.innerHTML = '';
-            
-            userData.trainingPlan.forEach(session => {
-                const tr = document.createElement('tr');
-                const date = new Date(session.date);
-                const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    const tbody = document.getElementById('full-plan-body');
+    tbody.innerHTML = '';
+    
+    userData.trainingPlan.forEach((session, index) => {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', () => startSelectedSession(index));
+        
+        const date = new Date(session.date);
+        const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+        
+        tr.innerHTML = `
+            <td>${formattedDate} (${session.day.charAt(0).toUpperCase() + session.day.slice(1)})</td>
+            <td>${session.typeName}</td>
+            <td>${session.distance} km</td>
+            <td>${session.pace} min/km</td>
+            <td>${session.completed ? '<i class="fas fa-check" style="color: #2ecc71;"></i>' : '<i class="fas fa-times" style="color: #e74c3c;"></i>'}</td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
+    
+    updateNextSession();
+}
+
+
+        function startSelectedSession(sessionIndex) {
+    const session = userData.trainingPlan[sessionIndex];
+
+    // Retirer la sélection précédente
+    document.querySelectorAll('#full-plan-table tr').forEach(tr => {
+        tr.classList.remove('selected-session');
+    });
+    
+    // Ajouter la sélection à la ligne cliquée
+    const allRows = document.querySelectorAll('#full-plan-table tr');
+    if (allRows.length > sessionIndex + 1) { // +1 pour l'en-tête
+        allRows[sessionIndex + 1].classList.add('selected-session');
+    }
                 
-                tr.innerHTML = `
-                    <td>${formattedDate} (${session.day.charAt(0).toUpperCase() + session.day.slice(1)})</td>
-                    <td>${session.typeName}</td>
-                    <td>${session.distance} km</td>
-                    <td>${session.pace} min/km</td>
-                    <td>${session.completed ? '<i class="fas fa-check" style="color: #2ecc71;"></i>' : '<i class="fas fa-times" style="color: #e74c3c;"></i>'}</td>
-                `;
-                
-                tbody.appendChild(tr);
-            });
-            
-            // Mettre à jour la prochaine séance
-            updateNextSession();
-        }
+    // Désactiver toutes les sections
+    sections.forEach(s => {
+        document.getElementById(`nav-${s}`).classList.remove('active');
+        document.getElementById(`${s}-section`).classList.remove('active');
+    });
+    
+    // Activer la section "Courir"
+    document.getElementById('nav-run').classList.add('active');
+    document.getElementById('run-section').classList.add('active');
+    
+    // Définir le type de course sélectionné
+    currentRunType = session.type;
+    document.getElementById(`${session.type}-run`).checked = true;
+    
+    // Mettre à jour l'affichage du rythme cible
+    document.getElementById('target-pace').textContent = session.pace;
+    
+    // Démarrer la course
+    startRun();
+}
         
         // Mettre à jour l'affichage de la prochaine séance
         function updateNextSession() {
@@ -2151,25 +2203,25 @@ function updateIntervalIndicator() {
         
         // Fonction pour démarrer la course
         async function startRun() {
-            // Réinitialiser les variables
-            isRunning = true;
-            currentDuration = 0;
-            distanceTraveled = 0;
-            locationData = [];
-            previousLocation = null;
-            kmSplits = [];
-            currentKmStartTime = 0;
-            currentKmStartDistance = 0;
-            currentRouteImage = null;
+    // Réinitialiser les variables
+    isRunning = true;
+    currentDuration = 0;
+    distanceTraveled = 0;
+    locationData = [];
+    previousLocation = null;
+    kmSplits = [];
+    currentKmStartTime = 0;
+    currentKmStartDistance = 0;
+    currentRouteImage = null;
 
-            // Initialiser les intervalles si nécessaire
+    // Utiliser le rythme cible de la session sélectionnée
+    const targetPace = document.getElementById('target-pace').textContent;
+    currentTargetPace = targetPace;
+
+    // Initialiser les intervalles si nécessaire
     if (runTypes[currentRunType].isInterval) {
         intervalPhase = 'work';
         intervalDistanceRemaining = runTypes[currentRunType].intervalDuration;
-        const currentPaceSeconds = paceToSeconds(userData.currentPace);
-        currentTargetPace = secondsToPace(currentPaceSeconds + 
-                           runTypes[currentRunType].paceOffset * 60);
-        document.getElementById('target-pace').textContent = currentTargetPace;
         
         // Première annonce
         if (userData.voiceEnabled) {
@@ -2178,6 +2230,9 @@ function updateIntervalIndicator() {
             speechSynthesis.speak(utterance);
         }
     }
+    
+    // ... le reste de la fonction reste inchangé ...
+}
             
             // Initialiser la carte
             initializeMap();

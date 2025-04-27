@@ -415,6 +415,35 @@
             background-color: rgba(52, 152, 219, 0.1);
         }
 
+/* Styles pour la création de plan */
+.days-selection {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.days-selection div {
+    display: flex;
+    align-items: center;
+}
+
+#plan-summary {
+    margin-bottom: 16px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+#plan-summary h3 {
+    color: var(--primary-color);
+    margin-bottom: 8px;
+}
+
+#generated-plan-table th {
+    white-space: nowrap;
+}
+        
         /* Styles pour les statistiques d'élévation */
         .elevation-chart {
             width: 100%;
@@ -504,6 +533,7 @@
         <button id="nav-run"><i class="fas fa-running"></i> Courir</button>
         <button id="nav-stats"><i class="fas fa-chart-line"></i> Stats</button>
         <button id="nav-profile"><i class="fas fa-user"></i> Profil</button>
+        <button id="nav-create-plan"><i class="fas fa-calendar-plus"></i> Créer plan</button>
     </nav>
     
     <div class="container">
@@ -724,6 +754,97 @@
                 </form>
             </div>
         </div>
+
+        <!-- Section Création de plan -->
+<div id="create-plan-section" class="section">
+    <div class="card">
+        <div class="card-title">Créer un plan d'entraînement</div>
+        <form id="plan-form">
+            <div class="form-group">
+                <label for="plan-distance">Distance de course cible</label>
+                <select class="form-control" id="plan-distance">
+                    <option value="5">5 km</option>
+                    <option value="10" selected>10 km</option>
+                    <option value="21.1">Semi-marathon (21.1 km)</option>
+                    <option value="42.2">Marathon (42.2 km)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="plan-event-date">Date de la course</label>
+                <input type="date" class="form-control" id="plan-event-date" min="">
+            </div>
+            
+            <div class="form-group">
+                <label for="plan-current-time">Votre temps actuel pour 10 km (hh:mm:ss)</label>
+                <input type="text" class="form-control" id="plan-current-time" placeholder="00:50:00">
+            </div>
+            
+            <div class="form-group">
+                <label for="plan-target-time">Temps objectif pour 10 km (hh:mm:ss)</label>
+                <input type="text" class="form-control" id="plan-target-time" placeholder="00:45:00">
+            </div>
+            
+            <div class="form-group">
+                <label for="plan-sessions">Nombre de séances par semaine</label>
+                <select class="form-control" id="plan-sessions">
+                    <option value="3">3 séances</option>
+                    <option value="4" selected>4 séances</option>
+                    <option value="5">5 séances</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Jours d'entraînement préférés</label>
+                <div class="days-selection">
+                    <input type="checkbox" id="plan-monday" name="plan-training-days">
+                    <label for="plan-monday">Lundi</label>
+                    
+                    <input type="checkbox" id="plan-tuesday" name="plan-training-days" checked>
+                    <label for="plan-tuesday">Mardi</label>
+                    
+                    <input type="checkbox" id="plan-wednesday" name="plan-training-days">
+                    <label for="plan-wednesday">Mercredi</label>
+                    
+                    <input type="checkbox" id="plan-thursday" name="plan-training-days" checked>
+                    <label for="plan-thursday">Jeudi</label>
+                    
+                    <input type="checkbox" id="plan-friday" name="plan-training-days">
+                    <label for="plan-friday">Vendredi</label>
+                    
+                    <input type="checkbox" id="plan-saturday" name="plan-training-days">
+                    <label for="plan-saturday">Samedi</label>
+                    
+                    <input type="checkbox" id="plan-sunday" name="plan-training-days" checked>
+                    <label for="plan-sunday">Dimanche</label>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-success">Générer le plan</button>
+        </form>
+    </div>
+    
+    <div class="card" id="generated-plan-card" style="display: none;">
+        <div class="card-title">Plan généré</div>
+        <div id="plan-summary"></div>
+        <table class="table" id="generated-plan-table">
+            <thead>
+                <tr>
+                    <th>Semaine</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Distance</th>
+                    <th>Rythme</th>
+                    <th>Objectif</th>
+                </tr>
+            </thead>
+            <tbody id="generated-plan-body">
+                <!-- Le plan généré sera affiché ici -->
+            </tbody>
+        </table>
+        <button class="btn" id="save-plan-btn"><i class="fas fa-save"></i> Sauvegarder ce plan</button>
+    </div>
+</div>
         
         <!-- Section Détails de course -->
         <div id="run-detail-section" class="section">
@@ -844,7 +965,11 @@
             voiceEnabled: true,
             runs: [], // Historique des courses
             trainingPlan: [] // Plan d'entraînement généré
+            customPlan: null // Stockera le plan personnalisé généré
+            
         };
+
+        
         
         // Variables pour le suivi de course
         let isRunning = false;
@@ -928,6 +1053,269 @@ const runTypes = {
                 return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
         }
+        
+    
+
+// Fonction pour générer un plan personnalisé
+function generateCustomPlan() {
+    // Récupérer les valeurs du formulaire
+    const distance = parseFloat(document.getElementById('plan-distance').value);
+    const eventDate = new Date(document.getElementById('plan-event-date').value);
+    const currentTime = document.getElementById('plan-current-time').value;
+    const targetTime = document.getElementById('plan-target-time').value;
+    const sessionsPerWeek = parseInt(document.getElementById('plan-sessions').value);
+    
+    // Récupérer les jours sélectionnés
+    const selectedDays = [];
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    days.forEach(day => {
+        if (document.getElementById(`plan-${day}`).checked) {
+            selectedDays.push(day);
+        }
+    });
+    
+    // Validation des entrées
+    if (!eventDate || isNaN(eventDate.getTime())) {
+        alert("Veuillez sélectionner une date valide");
+        return;
+    }
+    
+    if (!isValidTimeFormat(currentTime) || !isValidTimeFormat(targetTime)) {
+        alert("Veuillez entrer des temps valides au format hh:mm:ss");
+        return;
+    }
+    
+    if (selectedDays.length === 0) {
+        alert("Veuillez sélectionner au moins un jour d'entraînement");
+        return;
+    }
+    
+    if (selectedDays.length < sessionsPerWeek) {
+        alert(`Vous avez sélectionné ${selectedDays.length} jours mais demandé ${sessionsPerWeek} séances par semaine.`);
+        return;
+    }
+    
+    // Convertir les temps en secondes
+    const currentTimeSec = timeToSeconds(currentTime);
+    const targetTimeSec = timeToSeconds(targetTime);
+    
+    // Calculer les rythmes actuels et cibles (en secondes/km)
+    const currentPaceSec = currentTimeSec / 10; // pour 10km
+    const targetPaceSec = targetTimeSec / 10; // pour 10km
+    
+    // Calculer la durée totale du plan en semaines
+    const today = new Date();
+    const weeksDiff = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24 * 7));
+    
+    if (weeksDiff <= 0) {
+        alert("La date de la course doit être dans le futur");
+        return;
+    }
+    
+    // Créer le plan
+    const plan = [];
+    const progressPerWeek = (targetPaceSec - currentPaceSec) / weeksDiff;
+    
+    // Générer les semaines d'entraînement
+    for (let week = 1; week <= weeksDiff; week++) {
+        const weekStartDate = new Date(today);
+        weekStartDate.setDate(today.getDate() + ((week - 1) * 7));
+        
+        // Calculer le rythme cible pour cette semaine
+        const weekTargetPaceSec = currentPaceSec + (progressPerWeek * (week - 1));
+        
+        // Sélectionner aléatoirement les jours d'entraînement pour cette semaine
+        const shuffledDays = [...selectedDays].sort(() => 0.5 - Math.random());
+        const weekDays = shuffledDays.slice(0, sessionsPerWeek).sort();
+        
+        // Générer les séances pour chaque jour sélectionné
+        weekDays.forEach(day => {
+            const dayIndex = days.indexOf(day);
+            const sessionDate = new Date(weekStartDate);
+            sessionDate.setDate(weekStartDate.getDate() + dayIndex);
+            
+            // Déterminer le type de séance
+            let type, sessionDistance, sessionPaceSec;
+            
+            // En fonction de la semaine et du jour
+            if (week === weeksDiff) {
+                // Semaine de la course - séance légère
+                type = 'easy';
+                sessionDistance = distance * 0.5;
+                sessionPaceSec = weekTargetPaceSec + 60; // +1 min/km
+            } else if (day === 'tuesday' || day === 'wednesday' || day === 'thursday') {
+                // Jour de semaine - séance de qualité
+                type = Math.random() > 0.5 ? 'interval' : 'tempo';
+                
+                if (type === 'interval') {
+                    sessionDistance = 6 + (week * 0.2); // Augmente légèrement chaque semaine
+                    sessionPaceSec = weekTargetPaceSec - (15 * (week / weeksDiff)); // Plus rapide que la cible
+                } else {
+                    sessionDistance = 5 + (week * 0.1);
+                    sessionPaceSec = weekTargetPaceSec - (30 * (week / weeksDiff));
+                }
+            } else {
+                // Week-end - longue sortie ou course facile
+                if (day === 'saturday' || day === 'sunday') {
+                    type = 'long';
+                    sessionDistance = 8 + (week * 0.5); // Augmente progressivement
+                    sessionPaceSec = weekTargetPaceSec + 45; // +45 sec/km
+                } else {
+                    type = 'easy';
+                    sessionDistance = 5 + (week * 0.1);
+                    sessionPaceSec = weekTargetPaceSec + 60; // +1 min/km
+                }
+            }
+            
+            // Ajuster pour la distance cible
+            if (distance === 5) {
+                sessionDistance = Math.min(sessionDistance, 5);
+            } else if (distance === 21.1) {
+                // Pour semi-marathon
+                if (type === 'long') {
+                    sessionDistance = Math.min(8 + (week * 1.5), 18);
+                }
+            } else if (distance === 42.2) {
+                // Pour marathon
+                if (type === 'long') {
+                    sessionDistance = Math.min(10 + (week * 2), 32);
+                }
+            }
+            
+            // Arrondir les valeurs
+            sessionDistance = Math.round(sessionDistance * 2) / 2; // Arrondir au 0.5 km près
+            
+            // Ajouter la séance au plan
+            plan.push({
+                week: week,
+                date: sessionDate.toISOString().split('T')[0],
+                day: day,
+                type: type,
+                typeName: runTypes[type].name,
+                distance: sessionDistance,
+                pace: secondsToPace(sessionPaceSec),
+                goal: runTypes[type].description,
+                completed: false
+            });
+        });
+    }
+    
+    // Afficher le plan généré
+    displayGeneratedPlan(plan, distance, eventDate, currentTime, targetTime);
+}
+
+// Afficher le plan généré
+function displayGeneratedPlan(plan, distance, eventDate, currentTime, targetTime) {
+    const tbody = document.getElementById('generated-plan-body');
+    tbody.innerHTML = '';
+    
+    let currentWeek = 0;
+    
+    plan.forEach(session => {
+        if (session.week !== currentWeek) {
+            // Ajouter une ligne de séparation pour la nouvelle semaine
+            const weekRow = document.createElement('tr');
+            weekRow.className = 'week-separator';
+            weekRow.innerHTML = `<td colspan="6" style="background-color: #f8f9fa; font-weight: bold;">Semaine ${session.week}</td>`;
+            tbody.appendChild(weekRow);
+            currentWeek = session.week;
+        }
+        
+        const tr = document.createElement('tr');
+        const date = new Date(session.date);
+        const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+        
+        tr.innerHTML = `
+            <td>${session.week}</td>
+            <td>${formattedDate} (${session.day.charAt(0).toUpperCase() + session.day.slice(1)})</td>
+            <td>${session.typeName}</td>
+            <td>${session.distance} km</td>
+            <td>${session.pace} min/km</td>
+            <td>${session.goal}</td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
+    
+    // Mettre à jour le résumé
+    const formattedEventDate = eventDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    document.getElementById('plan-summary').innerHTML = `
+        <h3>Résumé du plan</h3>
+        <p><strong>Course cible:</strong> ${distance} km le ${formattedEventDate}</p>
+        <p><strong>Progression:</strong> De ${currentTime} à ${targetTime} pour 10 km</p>
+        <p><strong>Durée:</strong> ${plan[plan.length - 1].week} semaines</p>
+        <p><strong>Séances totales:</strong> ${plan.length}</p>
+    `;
+    
+    // Afficher la section du plan généré
+    document.getElementById('generated-plan-card').style.display = 'block';
+    
+    // Sauvegarder le plan généré temporairement
+    userData.customPlan = plan;
+}
+
+// Valider le format de temps hh:mm:ss
+function isValidTimeFormat(time) {
+    return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/.test(time);
+}
+
+// Convertir un temps hh:mm:ss en secondes
+function timeToSeconds(time) {
+    const parts = time.split(':').map(Number);
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+}
+
+// Sauvegarder le plan généré
+document.getElementById('save-plan-btn').addEventListener('click', function() {
+    if (!userData.customPlan) {
+        alert("Aucun plan à sauvegarder");
+        return;
+    }
+    
+    // Mettre à jour le plan d'entraînement
+    userData.trainingPlan = userData.customPlan;
+    
+    // Mettre à jour les autres données utilisateur
+    userData.targetPace = secondsToPace(timeToSeconds(document.getElementById('plan-target-time').value) / 10);
+    userData.currentPace = secondsToPace(timeToSeconds(document.getElementById('plan-current-time').value) / 10);
+    userData.eventDate = document.getElementById('plan-event-date').value;
+    
+    // Mettre à jour les jours d'entraînement
+    userData.trainingDays = [];
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    days.forEach(day => {
+        if (document.getElementById(`plan-${day}`).checked) {
+            userData.trainingDays.push(day);
+        }
+    });
+    
+    // Sauvegarder dans le stockage local
+    localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+    
+    // Mettre à jour l'affichage
+    updateProfileDisplay();
+    updateTrainingPlanDisplay();
+    
+    // Retourner à la section plan
+    sections.forEach(s => {
+        document.getElementById(`nav-${s}`).classList.remove('active');
+        document.getElementById(`${s}-section`).classList.remove('active');
+    });
+    
+    document.getElementById('nav-plan').classList.add('active');
+    document.getElementById('plan-section').classList.add('active');
+    
+    alert("Votre plan a été sauvegardé avec succès!");
+});
+
+// Gestion du formulaire de création de plan
+document.getElementById('plan-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    generateCustomPlan();
+});
+
+// Initialiser la date minimale (aujourd'hui + 1 jour)
+document.getElementById('plan-event-date').min = new Date(new Date().getTime() + 86400000).toISOString().split('T')[0];
         
         // Générer un plan d'entraînement jusqu'à la date de l'événement
         function generateTrainingPlan() {
@@ -1304,7 +1692,7 @@ const runTypes = {
         });
         
         // Navigation entre les sections
-        const sections = ['plan', 'run', 'stats', 'profile'];
+        const sections = ['plan', 'run', 'stats', 'profile', 'create-plan'];
         
         sections.forEach(section => {
             document.getElementById(`nav-${section}`).addEventListener('click', () => {

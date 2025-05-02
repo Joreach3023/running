@@ -2232,82 +2232,169 @@ function updateIntervalIndicator() {
             speechSynthesis.speak(utterance);
         }
     }
+    
+    // Initialiser la carte
+    initializeMap();
+    
+    // Nettoyer le parcours précédent sur la carte
+    if (window.routeLayer) {
+        window.routeLayer.clearLayers();
+    }
+    
+    // Réinitialiser l'affichage
+    document.getElementById('current-pace').textContent = "--:--";
+    document.getElementById('distance').textContent = "0.00";
+    document.getElementById('duration').textContent = "00:00";
+    document.getElementById('pace-feedback').textContent = "Course en cours...";
+    document.getElementById('pace-feedback').className = "good-pace";
+    
+    // Activer/désactiver les boutons
+    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i> Pause';
+    document.getElementById('pause-btn').onclick = pauseRun;
+    document.getElementById('stop-btn').disabled = false;
+    
+    // Démarrer le chrono
+    runInterval = setInterval(updateRunningTime, 1000);
+    
+    // Démarrer le GPS
+    startGpsTracking();
+    
+    // Instruction vocale
+    if (userData.voiceEnabled) {
+        const runType = runTypes[currentRunType];
+        const utterance = new SpeechSynthesisUtterance(`Début de la ${runType.name.toLowerCase()}. Objectif: ${document.getElementById('target-pace').textContent} minutes par kilomètre.`);
+        utterance.lang = 'fr-FR';
+        speechSynthesis.speak(utterance);
+        
+        // Afficher l'indicateur vocal
+        document.getElementById('voice-indicator').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('voice-indicator').classList.add('hidden');
+        }, 3000);
+    }
+
+    // Enregistrer le Service Worker pour le suivi en arrière-plan
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
             
-            // Initialiser la carte
-            initializeMap();
+            // Stocker les données de course pour l'arrière-plan
+            const runData = {
+                startTime: new Date().getTime(),
+                runType: currentRunType,
+                targetPace: currentTargetPace,
+                locations: []
+            };
             
-            // Nettoyer le parcours précédent sur la carte
-            if (window.routeLayer) {
-                window.routeLayer.clearLayers();
-            }
-            
-            // Réinitialiser l'affichage
-            document.getElementById('current-pace').textContent = "--:--";
-            document.getElementById('distance').textContent = "0.00";
-            document.getElementById('duration').textContent = "00:00";
-            document.getElementById('pace-feedback').textContent = "Course en cours...";
-            document.getElementById('pace-feedback').className = "good-pace";
-            
-            // Activer/désactiver les boutons
-            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i> Pause';
-            document.getElementById('pause-btn').onclick = pauseRun;
-            document.getElementById('stop-btn').disabled = false;
-            
-            // Démarrer le chrono
-            runInterval = setInterval(updateRunningTime, 1000);
-            
-            // Démarrer le GPS
-            startGpsTracking();
-            
-            // Instruction vocale
-            if (userData.voiceEnabled) {
-                const runType = runTypes[currentRunType];
-                const utterance = new SpeechSynthesisUtterance(`Début de la ${runType.name.toLowerCase()}. Objectif: ${document.getElementById('target-pace').textContent} minutes par kilomètre.`);
-                utterance.lang = 'fr-FR';
-                speechSynthesis.speak(utterance);
-                
-                // Afficher l'indicateur vocal
-                document.getElementById('voice-indicator').classList.remove('hidden');
-                setTimeout(() => {
-                    document.getElementById('voice-indicator').classList.add('hidden');
-                }, 3000);
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'SET_BACKGROUND_RUN',
+                    runData: runData
+                });
             }
 
-  // Enregistrer le Service Worker pour le suivi en arrière-plan
-  if ('serviceWorker' in navigator && 'SyncManager' in window) {
-    const registration = await navigator.serviceWorker.ready;
+            // Enregistrer la synchronisation si l'API est disponible
+            if ('SyncManager' in window) {
+                try {
+                    await registration.sync.register('sync-run-data');
+                    console.log('Sync registered for background tracking');
+                } catch (e) {
+                    console.log('Sync registration failed:', e);
+                }
+            }
+        } catch (error) {
+            console.error('Service Worker error:', error);
+        }
+    }
+
+    // Démarrer le suivi en arrière-plan si l'application est fermée
+    if ('wakeLock' in navigator) {
+        try {
+            const wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+                console.log('Wake Lock was released');
+            });
+            console.log('Wake Lock is active');
+        } catch (err) {
+            console.error('Wake Lock error:', err);
+        }
+    }
+}
+
+        // Stocker les données de course périodiquement
+function storeRunDataPeriodically() {
+    if (!isRunning) return;
     
-    // Stocker les données de course pour l'arrière-plan
     const runData = {
-      startTime: new Date().getTime(),
-      runType: currentRunType,
-      targetPace: currentTargetPace,
-      locations: []
+        startTime: new Date().getTime() - (currentDuration * 1000),
+        currentDuration: currentDuration,
+        distanceTraveled: distanceTraveled,
+        locations: locationData,
+        kmSplits: kmSplits,
+        runType: currentRunType,
+        targetPace: currentTargetPace
     };
     
-    navigator.serviceWorker.controller.postMessage({
-      type: 'SET_BACKGROUND_RUN',
-      runData: runData
-    });
-
-    // Enregistrer la synchronisation
-    try {
-      await registration.sync.register('sync-run-data');
-      console.log('Sync registered for background tracking');
-    } catch (e) {
-      console.log('Sync registration failed:', e);
+    localStorage.setItem('currentRunData', JSON.stringify(runData));
+    
+    // Envoyer au Service Worker
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+            type: 'UPDATE_BACKGROUND_RUN',
+            runData: runData
+        });
     }
-  }
+    
+    setTimeout(storeRunDataPeriodically, 10000); // Toutes les 10 secondes
+}
 
-  // Démarrer le suivi en arrière-plan si l'application est fermée
-  if ('wakeLock' in navigator) {
-    try {
-      const wakeLock = await navigator.wakeLock.request('screen');
-      console.log('Wake Lock is active');
-    } catch (err) {
-      console.error('Wake Lock error:', err);
+// Récupérer les données de course interrompue
+function recoverInterruptedRun() {
+    const savedRun = localStorage.getItem('currentRunData');
+    if (savedRun) {
+        const runData = JSON.parse(savedRun);
+        
+        // Vérifier si la course était en cours (moins de 1h depuis le dernier enregistrement)
+        const timeSinceLastUpdate = new Date().getTime() - (runData.startTime + (runData.currentDuration * 1000));
+        if (timeSinceLastUpdate < 3600000) { // 1 heure
+            const shouldResume = confirm("Une course en cours a été détectée. Voulez-vous reprendre ?");
+            if (shouldResume) {
+                // Restaurer les données
+                currentDuration = runData.currentDuration;
+                distanceTraveled = runData.distanceTraveled;
+                locationData = runData.locations || [];
+                kmSplits = runData.kmSplits || [];
+                currentRunType = runData.runType || 'easy';
+                currentTargetPace = runData.targetPace || userData.targetPace;
+                
+                // Redémarrer la course
+                startRun();
+                
+                // Mettre à jour l'affichage
+                document.getElementById('distance').textContent = (distanceTraveled / 1000).toFixed(2);
+                document.getElementById('duration').textContent = formatTime(currentDuration);
+                
+                // Restaurer la carte si possible
+                if (locationData.length > 0 && mapObject) {
+                    updateMap(locationData[locationData.length-1].latitude, 
+                             locationData[locationData.length-1].longitude);
+                    
+                    // Redessiner le parcours
+                    if (window.routeLayer) {
+                        window.routeLayer.clearLayers();
+                        const points = locationData.map(loc => [loc.latitude, loc.longitude]);
+                        L.polyline(points, {color: 'blue', weight: 5}).addTo(window.routeLayer);
+                    }
+                }
+                
+                return true;
+            }
+        }
+        
+        // Nettoyer si l'utilisateur ne veut pas reprendre
+        localStorage.removeItem('currentRunData');
     }
-  }
+    return false;
 }
 
 // Gérer la reprise après arrière-plan
@@ -2436,20 +2523,39 @@ const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} simulé 
         
         // Fonction pour mettre en pause la course
         function pauseRun() {
-            isRunning = false;
-            clearInterval(runInterval);
-            stopGpsTracking();
-            
-            // Mettre à jour l'affichage des boutons
-            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i> Reprendre';
-            document.getElementById('pause-btn').onclick = resumeRun;
-            document.getElementById('pace-feedback').textContent = "Course en pause";
-            
-            // Instruction vocale
-            if (userData.voiceEnabled) {
-                const utterance = new SpeechSynthesisUtterance("Course en pause");
-                utterance.lang = 'fr-FR';
-                speechSynthesis.speak(utterance);
+    isRunning = false;
+    clearInterval(runInterval);
+    stopGpsTracking();
+    
+    // Mettre à jour l'affichage des boutons
+    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i> Reprendre';
+    document.getElementById('pause-btn').onclick = resumeRun;
+    document.getElementById('pace-feedback').textContent = "Course en pause";
+    
+    // Sauvegarder l'état actuel
+    storeRunDataPeriodically();
+    
+    // Instruction vocale
+    if (userData.voiceEnabled) {
+        const utterance = new SpeechSynthesisUtterance("Course en pause");
+        utterance.lang = 'fr-FR';
+        speechSynthesis.speak(utterance);
+    }
+}
+
+// Fonction pour arrêter la course
+document.getElementById('stop-btn').addEventListener('click', async function() {
+    if (isRunning || document.getElementById('pause-btn').innerHTML.includes('Reprendre')) {
+        clearInterval(runInterval);
+        stopGpsTracking();
+        
+        // Nettoyer les données de course en cours
+        localStorage.removeItem('currentRunData');
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+                type: 'CLEAR_BACKGROUND_RUN'
+            });
+        }
                 
                 // Afficher l'indicateur vocal
                 document.getElementById('voice-indicator').classList.remove('hidden');
@@ -2574,55 +2680,61 @@ const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} simulé 
         
         // Charger les données utilisateur depuis le stockage local au démarrage
         window.addEventListener('DOMContentLoaded', function() {
-            const savedData = localStorage.getItem('runPacerUserData');
-            if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                Object.assign(userData, parsedData);
-                
-                // Mettre à jour le formulaire avec les données sauvegardées
-                document.getElementById('current-pace-input').value = userData.currentPace;
-                document.getElementById('target-pace-input').value = userData.targetPace;
-                document.getElementById('event-date-input').value = userData.eventDate;
-                
-                // Jours d'entraînement
-                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-                days.forEach(day => {
-                    document.getElementById(day).checked = userData.trainingDays.includes(day);
-                });
-                
-                // Instructions vocales
-                document.getElementById('voice-enabled').checked = userData.voiceEnabled;
-                
-                // Mettre à jour l'affichage
-                updateProfileDisplay();
-                
-                // Générer le plan d'entraînement
-                generateTrainingPlan();
-                
-                // Mettre à jour l'historique
-                updateHistory();
-            } else {
-                // Générer un plan d'entraînement par défaut
-                generateTrainingPlan();
-            }
-            
-            // Vérifier la disponibilité de la synthèse vocale
-            if ('speechSynthesis' in window) {
-                console.log("Synthèse vocale disponible");
-            } else {
-                console.log("Synthèse vocale non disponible");
-                userData.voiceEnabled = false;
-                document.getElementById('voice-enabled').checked = false;
-                document.getElementById('voice-enabled').disabled = true;
-            }
-            
-            // Initialiser une carte simple (placeholder)
-            const mapElement = document.getElementById('map');
-            mapElement.innerHTML = '<div style="background-color: #e0e0e0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"><i class="fas fa-map-marker-alt" style="font-size: 2rem; color: #3498db;"></i><span style="margin-left: 10px;">Carte de suivi GPS</span></div>';
-            
-            // Définir le bouton pause/démarrer
-            document.getElementById('pause-btn').onclick = startRun;
+    // Charger les données utilisateur
+    const savedData = localStorage.getItem('runPacerUserData');
+    if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        Object.assign(userData, parsedData);
+        
+        // Mettre à jour le formulaire avec les données sauvegardées
+        document.getElementById('current-pace-input').value = userData.currentPace;
+        document.getElementById('target-pace-input').value = userData.targetPace;
+        document.getElementById('event-date-input').value = userData.eventDate;
+        
+        // Jours d'entraînement
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        days.forEach(day => {
+            document.getElementById(day).checked = userData.trainingDays.includes(day);
         });
+        
+        // Instructions vocales
+        document.getElementById('voice-enabled').checked = userData.voiceEnabled;
+        
+        // Mettre à jour l'affichage
+        updateProfileDisplay();
+    }
+    
+    // Charger le plan d'entraînement
+    loadTrainingPlan();
+    
+    // Vérifier s'il y a une course à récupérer
+    if (!recoverInterruptedRun()) {
+        // Générer un plan d'entraînement par défaut si aucun n'existe
+        if (userData.trainingPlan.length === 0) {
+            generateTrainingPlan();
+        }
+    }
+    
+    // Vérifier la disponibilité de la synthèse vocale
+    if ('speechSynthesis' in window) {
+        console.log("Synthèse vocale disponible");
+    } else {
+        console.log("Synthèse vocale non disponible");
+        userData.voiceEnabled = false;
+        document.getElementById('voice-enabled').checked = false;
+        document.getElementById('voice-enabled').disabled = true;
+    }
+    
+    // Initialiser une carte simple (placeholder)
+    const mapElement = document.getElementById('map');
+    mapElement.innerHTML = '<div style="background-color: #e0e0e0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"><i class="fas fa-map-marker-alt" style="font-size: 2rem; color: #3498db;"></i><span style="margin-left: 10px;">Carte de suivi GPS</span></div>';
+    
+    // Définir le bouton pause/démarrer
+    document.getElementById('pause-btn').onclick = startRun;
+    
+    // Démarrer le stockage périodique des données
+    setTimeout(storeRunDataPeriodically, 10000);
+});
 
         // Service Worker pour la fonctionnalité PWA
         if ('serviceWorker' in navigator) {

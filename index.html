@@ -982,7 +982,9 @@
     customPlan: null // Stockera le plan personnalisé généré
 };
 
-        
+        // Variables pour le suivi en arrière-plan
+let isBackgroundRun = false;
+let backgroundRunInterval;
         
         // Variables pour le suivi de course
         let isRunning = false;
@@ -2270,7 +2272,140 @@ function updateIntervalIndicator() {
                     document.getElementById('voice-indicator').classList.add('hidden');
                 }, 3000);
             }
+
+  // Enregistrer le Service Worker pour le suivi en arrière-plan
+  if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    const registration = await navigator.serviceWorker.ready;
+    
+    // Stocker les données de course pour l'arrière-plan
+    const runData = {
+      startTime: new Date().getTime(),
+      runType: currentRunType,
+      targetPace: currentTargetPace,
+      locations: []
+    };
+    
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SET_BACKGROUND_RUN',
+      runData: runData
+    });
+
+    // Enregistrer la synchronisation
+    try {
+      await registration.sync.register('sync-run-data');
+      console.log('Sync registered for background tracking');
+    } catch (e) {
+      console.log('Sync registration failed:', e);
+    }
+  }
+
+  // Démarrer le suivi en arrière-plan si l'application est fermée
+  if ('wakeLock' in navigator) {
+    try {
+      const wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock is active');
+    } catch (err) {
+      console.error('Wake Lock error:', err);
+    }
+  }
+}
+
+// Gérer la reprise après arrière-plan
+function handleAppResume() {
+  if (isBackgroundRun) {
+    // Récupérer les données du Service Worker
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'GET_BACKGROUND_RUN'
+      });
+    }
+    
+    // Redémarrer le suivi
+    isBackgroundRun = false;
+    startRun();
+  }
+}
+
+// Écouter les messages du Service Worker
+navigator.serviceWorker.addEventListener('message', event => {
+  if (event.data.type === 'BACKGROUND_RUN_DATA') {
+    const runData = event.data.runData;
+    // Traiter les données récupérées de l'arrière-plan
+    console.log('Données récupérées:', runData);
+    
+    // Mettre à jour l'interface avec les données
+    if (runData.locations.length > 0) {
+      locationData = runData.locations;
+      distanceTraveled = calculateTotalDistance(runData.locations);
+      currentDuration = Math.floor((new Date().getTime() - runData.startTime) / 1000);
+      
+      // Mettre à jour l'affichage
+      document.getElementById('distance').textContent = (distanceTraveled / 1000).toFixed(2);
+      document.getElementById('duration').textContent = formatTime(currentDuration);
+      
+      // Recalculer le rythme
+      if (distanceTraveled > 0 && currentDuration > 0) {
+        const paceSeconds = (currentDuration / (distanceTraveled / 1000));
+        const avgPace = secondsToPace(paceSeconds);
+        document.getElementById('current-pace').textContent = avgPace;
+      }
+    }
+  }
+});
+
+// Calculer la distance totale à partir des points GPS
+function calculateTotalDistance(locations) {
+  let total = 0;
+  for (let i = 1; i < locations.length; i++) {
+    total += calculateDistance(
+      locations[i-1].latitude, locations[i-1].longitude,
+      locations[i].latitude, locations[i].longitude
+    );
+  }
+  return total;
+}
+
+// Écouter les événements de visibilité de la page
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    // L'application passe en arrière-plan
+    if (isRunning) {
+      isBackgroundRun = true;
+      console.log('Application en arrière-plan, suivi continu');
+    }
+  } else {
+    // L'application revient au premier plan
+    handleAppResume();
+  }
+});
+
+// Sauvegarder automatiquement le plan d'entraînement
+function saveTrainingPlan() {
+  localStorage.setItem('runPacerTrainingPlan', JSON.stringify(userData.trainingPlan));
+}
+
+// Charger le plan d'entraînement au démarrage
+function loadTrainingPlan() {
+  const savedPlan = localStorage.getItem('runPacerTrainingPlan');
+  if (savedPlan) {
+    userData.trainingPlan = JSON.parse(savedPlan);
+    updateTrainingPlanDisplay();
+  }
+}
+
+// Modifier la fonction generateTrainingPlan pour sauvegarder automatiquement
+function generateTrainingPlan() {
+  // ... (code existant)
+  saveTrainingPlan(); // Ajouter cette ligne à la fin
+}
+
+// Appeler loadTrainingPlan au chargement de la page
+window.addEventListener('DOMContentLoaded', function() {
+  // ... (code existant)
+  loadTrainingPlan(); // Ajouter cette ligne
+});
         }
+        
         
         // Mettre à jour uniquement le temps qui s'écoule
         function updateRunningTime() {

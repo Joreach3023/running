@@ -92,10 +92,31 @@ self.addEventListener('sync', function(event) {
 // Stockage des données de course en arrière-plan
 let backgroundRunData = null;
 
+// Dans service-worker.js
 self.addEventListener('message', (event) => {
   if (event.data.type === 'SET_BACKGROUND_RUN') {
     backgroundRunData = event.data.runData;
     console.log('Données de course stockées pour arrière-plan');
+  }
+  else if (event.data.type === 'UPDATE_BACKGROUND_RUN') {
+    // Fusionner les nouvelles données avec les existantes
+    if (backgroundRunData) {
+      backgroundRunData = {
+        ...backgroundRunData,
+        ...event.data.runData,
+        locations: [...backgroundRunData.locations, ...event.data.runData.locations]
+      };
+    } else {
+      backgroundRunData = event.data.runData;
+    }
+    console.log('Données de course mises à jour');
+  }
+  else if (event.data.type === 'GET_BACKGROUND_RUN') {
+    event.ports[0].postMessage({
+      type: 'BACKGROUND_RUN_DATA',
+      runData: backgroundRunData
+    });
+    backgroundRunData = null; // Nettoyer après envoi
   }
 });
 

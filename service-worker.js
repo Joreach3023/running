@@ -1,5 +1,5 @@
 // Nom du cache
-const CACHE_NAME = 'runpacer-cache-v2';
+const CACHE_NAME = 'runpacer-cache-v3';
 
 // Fichiers à mettre en cache
 const urlsToCache = [
@@ -84,20 +84,41 @@ self.addEventListener('activate', function(event) {
 
 // Gestion des synchronisations en arrière-plan
 self.addEventListener('sync', function(event) {
-  if (event.tag === 'sync-runs') {
-    event.waitUntil(syncRuns());
+  if (event.tag === 'sync-run-data') {
+    event.waitUntil(syncRunData());
   }
 });
 
-// Fonction pour synchroniser les courses en arrière-plan
-function syncRuns() {
-  // Ici, vous pourriez implémenter une logique pour envoyer les courses
-  // stockées en local vers un serveur distant
-  console.log('Synchronisation des courses en arrière-plan');
-  
-  // Exemple de notification après synchronisation
-  self.registration.showNotification('RunPacer', {
-    body: 'Vos courses ont été synchronisées',
-    icon: '/icons/icon-192x192.png'
+// Stockage des données de course en arrière-plan
+let backgroundRunData = null;
+
+self.addEventListener('message', (event) => {
+  if (event.data.type === 'SET_BACKGROUND_RUN') {
+    backgroundRunData = event.data.runData;
+    console.log('Données de course stockées pour arrière-plan');
+  }
+});
+
+// Fonction pour synchroniser les données de course
+function syncRunData() {
+  if (!backgroundRunData) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    // Simuler l'envoi des données au serveur
+    console.log('Synchronisation des données de course en arrière-plan:', backgroundRunData);
+    
+    // Envoyer les données à la page lorsque l'application est rouverte
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'BACKGROUND_RUN_DATA',
+          runData: backgroundRunData
+        });
+      });
+    });
+    
+    resolve();
   });
 }

@@ -2477,10 +2477,15 @@ function handleAppResume() {
         type: 'GET_BACKGROUND_RUN'
       });
     }
-    
-    // Redémarrer le suivi
+
+    // Reprendre le suivi sans réinitialiser
     isBackgroundRun = false;
-    startRun();
+    if (!runInterval) {
+      runInterval = setInterval(updateRunningTime, 1000);
+    }
+    if (!isTrackingLocation) {
+      startGpsTracking();
+    }
   }
 }
 

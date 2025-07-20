@@ -189,31 +189,6 @@
             justify-content: space-around;
             margin-top: var(--spacing);
         }
-
-        #countdown-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 4rem;
-            z-index: 1000;
-        }
-
-        .countdown-number {
-            animation: fadeNumber 1s forwards;
-        }
-
-        @keyframes fadeNumber {
-            0% { opacity: 0; transform: scale(0.5); }
-            50% { opacity: 1; transform: scale(1.2); }
-            100% { opacity: 0; transform: scale(0.5); }
-        }
         
         .big-metric {
             font-size: 3rem;
@@ -607,78 +582,9 @@
         #run-detail-section.active {
             display: block;
         }
-
-        /* Écran d'accueil animé */
-        #splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-
-        #splash-screen.fade-out {
-            opacity: 0;
-            transition: opacity 0.5s ease;
-            pointer-events: none;
-        }
-
-        .runner-icon {
-            font-size: 3rem;
-            color: var(--primary-color);
-            animation: runMove 2s ease-in-out forwards;
-        }
-
-        .runner-track {
-            width: 120px;
-            height: 4px;
-            background-color: var(--light-color);
-            border-radius: 2px;
-            overflow: hidden;
-            margin-top: 8px;
-            position: relative;
-        }
-
-        .runner-track::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 0;
-            background-color: var(--secondary-color);
-            animation: trackDraw 2s forwards;
-        }
-
-        .splash-logo {
-            font-size: 2rem;
-            margin-top: 20px;
-            color: var(--dark-color);
-        }
-
-        @keyframes runMove {
-            from { transform: translateX(-40px); }
-            to { transform: translateX(40px); }
-        }
-
-        @keyframes trackDraw {
-            from { width: 0; }
-            to { width: 100%; }
-        }
     </style>
 </head>
 <body>
-    <div id="splash-screen">
-        <i class="fas fa-running runner-icon"></i>
-        <div class="runner-track"></div>
-        <div class="splash-logo">RunPacer</div>
-    </div>
     <header>
         <button id="theme-toggle" title="Changer de thème"><i class="fas fa-moon"></i></button>
         <h1>RunPacer</h1>
@@ -797,9 +703,6 @@
             
             <div class="voice-indicator hidden" id="voice-indicator">
                 <i class="fas fa-volume-up"></i>
-            </div>
-            <div id="countdown-overlay" class="hidden">
-                <span id="countdown-number"></span>
             </div>
         </div>
         
@@ -1639,8 +1542,8 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
     // Mettre à jour l'affichage du rythme cible
     document.getElementById('target-pace').textContent = session.pace;
     
-    // Démarrer la course avec compte à rebours
-    startRunWithCountdown();
+    // Démarrer la course
+    startRun();
 }
         
         // Mettre à jour l'affichage de la prochaine séance
@@ -2028,8 +1931,8 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
             
             document.getElementById('target-pace').textContent = secondsToPace(targetPaceSeconds);
             
-            // Démarrer la course avec compte à rebours
-            startRunWithCountdown();
+            // Démarrer la simulation de course
+            startRun();
         });
         
         // Gestion du changement de type de course
@@ -2525,57 +2428,6 @@ function storeRunDataPeriodically() {
     }
     
     setTimeout(storeRunDataPeriodically, 10000); // Toutes les 10 secondes
-}
-
-// Afficher un compte à rebours avant de démarrer la course
-function showCountdown(callback) {
-    const overlay = document.getElementById('countdown-overlay');
-    const numberEl = document.getElementById('countdown-number');
-    const sequence = ['3', '2', '1', 'Go!'];
-    let index = 0;
-
-    overlay.classList.remove('hidden');
-    numberEl.textContent = sequence[index];
-    numberEl.classList.add('countdown-number');
-
-    const hideOverlay = () => {
-        overlay.classList.add('hidden');
-        numberEl.classList.remove('countdown-number');
-    };
-
-    const failSafe = setTimeout(() => {
-        clearInterval(interval);
-        hideOverlay();
-        callback();
-    }, sequence.length * 1000 + 2000);
-
-    const interval = setInterval(() => {
-        index++;
-        if (index < sequence.length) {
-            numberEl.textContent = sequence[index];
-            numberEl.classList.remove('countdown-number');
-            void numberEl.offsetWidth;
-            numberEl.classList.add('countdown-number');
-        } else {
-            clearInterval(interval);
-            clearTimeout(failSafe);
-            setTimeout(() => {
-                hideOverlay();
-                callback();
-            }, 500);
-        }
-    }, 1000);
-
-    overlay.addEventListener('click', () => {
-        clearInterval(interval);
-        clearTimeout(failSafe);
-        hideOverlay();
-        callback();
-    }, { once: true });
-}
-
-function startRunWithCountdown() {
-    showCountdown(startRun);
 }
 
 // Récupérer les données de course interrompue
@@ -3147,17 +2999,6 @@ function loadTrainingPlan() {
                 alert('Erreur Strava: ' + err.message);
             }
         }
-
-        // Disparition de l'écran d'accueil après chargement
-        window.addEventListener('load', function() {
-            const splash = document.getElementById('splash-screen');
-            if (splash) {
-                setTimeout(() => {
-                    splash.classList.add('fade-out');
-                    setTimeout(() => splash.remove(), 600);
-                }, 1500);
-            }
-        });
     </script>
     <footer><a href="PRIVACY.md">Politique de confidentialite</a></footer>
 </body>

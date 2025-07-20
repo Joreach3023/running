@@ -2393,9 +2393,10 @@ function updateIntervalIndicator() {
 }
 
         // Stocker les données de course périodiquement
-function storeRunDataPeriodically() {
+// Sauvegarder les données de course une fois
+function storeRunData() {
     if (!isRunning) return;
-    
+
     const runData = {
         startTime: new Date().getTime() - (currentDuration * 1000),
         currentDuration: currentDuration,
@@ -2405,17 +2406,20 @@ function storeRunDataPeriodically() {
         runType: currentRunType,
         targetPace: currentTargetPace
     };
-    
+
     localStorage.setItem('currentRunData', JSON.stringify(runData));
-    
-    // Envoyer au Service Worker
+
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({
             type: 'UPDATE_BACKGROUND_RUN',
             runData: runData
         });
     }
-    
+}
+
+// Stocker les données de course périodiquement
+function storeRunDataPeriodically() {
+    storeRunData();
     setTimeout(storeRunDataPeriodically, 10000); // Toutes les 10 secondes
 }
 
@@ -2529,6 +2533,7 @@ document.addEventListener('visibilitychange', () => {
     // L'application passe en arrière-plan
     if (isRunning) {
       isBackgroundRun = true;
+      storeRunData();
       console.log('Application en arrière-plan, suivi continu');
     }
   } else {
@@ -2536,6 +2541,18 @@ document.addEventListener('visibilitychange', () => {
     handleAppResume();
   }
 });
+
+// Sauvegarder lorsqu'on quitte la page
+window.addEventListener('pagehide', () => {
+  if (isRunning) {
+    storeRunData();
+    isBackgroundRun = true;
+    console.log('Données sauvegardées avant de quitter la page');
+  }
+});
+
+// Reprendre après retour sur la page
+window.addEventListener('pageshow', handleAppResume);
 
 // Sauvegarder automatiquement le plan d'entraînement
 function saveTrainingPlan() {

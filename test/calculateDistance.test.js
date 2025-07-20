@@ -1,15 +1,5 @@
-const fs = require('fs');
-const path = require('path');
 const { expect } = require('chai');
-
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const match = html.match(/function\s+calculateDistance\([^)]*\)\s*{[\s\S]*?}/);
-if (!match) {
-  throw new Error('calculateDistance function not found in index.html');
-}
-// Evaluate the function definition to make calculateDistance available
-// eslint-disable-next-line no-eval
-eval(match[0]);
+const { calculateDistance } = require('../utils');
 
 describe('calculateDistance', () => {
   it('returns distance between Paris and London within tolerance', () => {

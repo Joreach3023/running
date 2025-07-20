@@ -765,6 +765,12 @@
                             <label for="voice-enabled">Activer les instructions vocales</label>
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label for="strava-token-input">Token d'accès Strava</label>
+                        <input type="text" class="form-control" id="strava-token-input" placeholder="OAuth token">
+                        <div class="form-hint">Générez un token depuis votre compte Strava</div>
+                    </div>
                     
                     <button type="submit" class="btn btn-success">Enregistrer les modifications</button>
                 </form>
@@ -915,6 +921,7 @@
             <div class="run-controls">
                 <button class="btn" id="share-run-btn"><i class="fas fa-share-alt"></i> Partager</button>
                 <button class="btn" id="export-gpx-btn"><i class="fas fa-file-export"></i> Exporter GPX</button>
+                <button class="btn" id="strava-upload-btn"><i class="fab fa-strava"></i> Strava</button>
                 <button class="btn" id="back-to-stats-btn"><i class="fas fa-arrow-left"></i> Retour</button>
             </div>
         </div>
@@ -979,6 +986,7 @@
     eventDate: "2025-06-07",
     trainingDays: ["tuesday", "thursday", "sunday"],
     voiceEnabled: true,
+    stravaToken: "",
     runs: [], // Historique des courses
     trainingPlan: [], // Plan d'entraînement généré
     customPlan: null // Stockera le plan personnalisé généré
@@ -1674,6 +1682,7 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
             // Configurer les boutons
             document.getElementById('share-run-btn').onclick = () => shareRun(run);
             document.getElementById('export-gpx-btn').onclick = () => exportToGPX(run);
+            document.getElementById('strava-upload-btn').onclick = () => publishToStrava(run);
             document.getElementById('back-to-stats-btn').onclick = () => {
                 document.getElementById('run-detail-section').classList.remove('active');
                 document.getElementById('nav-stats').classList.add('active');
@@ -1783,6 +1792,7 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
             userData.currentPace = document.getElementById('current-pace-input').value;
             userData.targetPace = document.getElementById('target-pace-input').value;
             userData.eventDate = document.getElementById('event-date-input').value;
+            userData.stravaToken = document.getElementById('strava-token-input').value;
             
             // Mettre à jour les jours d'entraînement
             userData.trainingDays = [];
@@ -2663,6 +2673,7 @@ function loadTrainingPlan() {
         document.getElementById('current-pace-input').value = userData.currentPace;
         document.getElementById('target-pace-input').value = userData.targetPace;
         document.getElementById('event-date-input').value = userData.eventDate;
+        document.getElementById('strava-token-input').value = userData.stravaToken || '';
         
         // Jours d'entraînement
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -2730,15 +2741,9 @@ function loadTrainingPlan() {
             alert("Votre appareil ne prend pas en charge la géolocalisation. Certaines fonctionnalités ne seront pas disponibles.");
         }
 
-        // Exporter la course au format GPX
-        function exportToGPX(run) {
-            // Vérifier si des données GPS sont disponibles
-            if (!run.gpsData || run.gpsData.length < 2) {
-                alert("Pas de données GPS disponibles pour cette course");
-                return;
-            }
-            
-            // Créer le contenu du fichier GPX
+        function generateGPX(run) {
+            if (!run.gpsData || run.gpsData.length < 2) return null;
+
             let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="RunPacer App" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
@@ -2748,8 +2753,7 @@ function loadTrainingPlan() {
   <trk>
     <name>Course ${run.type} - ${run.distance}km</name>
     <trkseg>`;
-            
-            // Ajouter chaque point GPS
+
             run.gpsData.forEach(point => {
                 gpxContent += `
       <trkpt lat="${point.latitude}" lon="${point.longitude}">
@@ -2757,12 +2761,22 @@ function loadTrainingPlan() {
         <time>${new Date(point.timestamp).toISOString()}</time>
       </trkpt>`;
             });
-            
-            // Fermer les balises
+
             gpxContent += `
     </trkseg>
   </trk>
 </gpx>`;
+
+            return gpxContent;
+        }
+
+        // Exporter la course au format GPX
+        function exportToGPX(run) {
+            const gpxContent = generateGPX(run);
+            if (!gpxContent) {
+                alert("Pas de données GPS disponibles pour cette course");
+                return;
+            }
             
             // Créer un Blob et un lien de téléchargement
             const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
@@ -2793,6 +2807,56 @@ function loadTrainingPlan() {
                 // Fallback si Web Share API n'est pas disponible
                 const shareText = `J'ai couru ${run.distance}km en ${formatTime(run.duration)} (rythme: ${run.pace}/km) avec RunPacer!`;
                 alert("Fonction de partage non disponible. Voici le texte à partager:\n\n" + shareText);
+            }
+        }
+
+        async function publishToStrava(run) {
+            const token = userData.stravaToken;
+            if (!token) {
+                alert("Ajoutez votre token Strava dans le profil");
+                return;
+            }
+
+            try {
+                if (run.gpsData && run.gpsData.length >= 2) {
+                    const gpxContent = generateGPX(run);
+                    const formData = new FormData();
+                    formData.append('file', new Blob([gpxContent], { type: 'application/gpx+xml' }), 'run.gpx');
+                    formData.append('data_type', 'gpx');
+                    formData.append('name', `RunPacer ${run.distance}km`);
+                    formData.append('description', `Rythme ${run.pace}/km via RunPacer`);
+                    formData.append('activity_type', 'run');
+
+                    const resp = await fetch('https://www.strava.com/api/v3/uploads', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token },
+                        body: formData
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error(data.message || 'Erreur');
+                    alert('Course envoyée sur Strava. Elle apparaîtra une fois traitée.');
+                } else {
+                    const params = new URLSearchParams();
+                    params.append('name', `RunPacer ${run.distance}km`);
+                    params.append('type', 'Run');
+                    params.append('start_date_local', run.date + 'T00:00:00');
+                    params.append('elapsed_time', Math.round(run.duration));
+                    params.append('description', `Rythme ${run.pace}/km via RunPacer`);
+                    params.append('distance', Math.round(parseFloat(run.distance) * 1000));
+                    const resp = await fetch('https://www.strava.com/api/v3/activities', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: params.toString()
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error(data.message || 'Erreur');
+                    alert('Course ajoutée sur Strava.');
+                }
+            } catch (err) {
+                alert('Erreur Strava: ' + err.message);
             }
         }
     </script>

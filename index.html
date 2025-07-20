@@ -2538,6 +2538,17 @@ function showCountdown(callback) {
     numberEl.textContent = sequence[index];
     numberEl.classList.add('countdown-number');
 
+    const hideOverlay = () => {
+        overlay.classList.add('hidden');
+        numberEl.classList.remove('countdown-number');
+    };
+
+    const failSafe = setTimeout(() => {
+        clearInterval(interval);
+        hideOverlay();
+        callback();
+    }, sequence.length * 1000 + 2000);
+
     const interval = setInterval(() => {
         index++;
         if (index < sequence.length) {
@@ -2547,13 +2558,20 @@ function showCountdown(callback) {
             numberEl.classList.add('countdown-number');
         } else {
             clearInterval(interval);
+            clearTimeout(failSafe);
             setTimeout(() => {
-                overlay.classList.add('hidden');
-                numberEl.classList.remove('countdown-number');
+                hideOverlay();
                 callback();
             }, 500);
         }
     }, 1000);
+
+    overlay.addEventListener('click', () => {
+        clearInterval(interval);
+        clearTimeout(failSafe);
+        hideOverlay();
+        callback();
+    }, { once: true });
 }
 
 function startRunWithCountdown() {

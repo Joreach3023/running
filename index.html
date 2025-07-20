@@ -2543,27 +2543,6 @@ const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} simulé 
     }
 }
 
-// Fonction pour arrêter la course
-document.getElementById('stop-btn').addEventListener('click', async function() {
-    if (isRunning || document.getElementById('pause-btn').innerHTML.includes('Reprendre')) {
-        clearInterval(runInterval);
-        stopGpsTracking();
-        
-        // Nettoyer les données de course en cours
-        localStorage.removeItem('currentRunData');
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-                type: 'CLEAR_BACKGROUND_RUN'
-            });
-        }
-                
-                // Afficher l'indicateur vocal
-                document.getElementById('voice-indicator').classList.remove('hidden');
-                setTimeout(() => {
-                    document.getElementById('voice-indicator').classList.add('hidden');
-                }, 3000);
-            }
-        });
         
         // Fonction pour reprendre la course
         function resumeRun() {

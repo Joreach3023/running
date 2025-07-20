@@ -582,6 +582,22 @@
         #run-detail-section.active {
             display: block;
         }
+
+        /* Compte à rebours avant la course */
+        #countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5rem;
+            z-index: 9999;
+        }
     </style>
 </head>
 <body>
@@ -1029,6 +1045,9 @@
             </div>
         </div>
     </div>
+    <div id="countdown-overlay" class="hidden">
+        <span id="countdown-number">3</span>
+    </div>
 
     <script>
         // Configuration initiale
@@ -1155,6 +1174,58 @@ const runTypes = {
                 return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             } else {
                 return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        function playBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = 440;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                setTimeout(() => {
+                    osc.stop();
+                    ctx.close();
+                }, 150);
+            } catch (e) {
+                console.log('Audio error', e);
+            }
+        }
+
+        function showCountdown(callback) {
+            const overlay = document.getElementById('countdown-overlay');
+            const numberEl = document.getElementById('countdown-number');
+            const sequence = ['3', '2', '1', 'GO!'];
+            let index = 0;
+            overlay.classList.remove('hidden');
+            numberEl.textContent = sequence[index];
+            playBeep();
+            index++;
+            const interval = setInterval(() => {
+                if (index < sequence.length) {
+                    numberEl.textContent = sequence[index];
+                    playBeep();
+                    if (sequence[index] === 'GO!' && navigator.vibrate) {
+                        navigator.vibrate([200, 100, 200]);
+                    }
+                    index++;
+                } else {
+                    clearInterval(interval);
+                    overlay.classList.add('hidden');
+                    if (callback) callback();
+                }
+            }, 1000);
+        }
+
+        function startRunWithCountdown() {
+            if (currentDuration > 0) {
+                startRun();
+            } else {
+                showCountdown(startRun);
             }
         }
         
@@ -1541,9 +1612,9 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
     
     // Mettre à jour l'affichage du rythme cible
     document.getElementById('target-pace').textContent = session.pace;
-    
+
     // Démarrer la course
-    startRun();
+    startRunWithCountdown();
 }
         
         // Mettre à jour l'affichage de la prochaine séance
@@ -1932,7 +2003,7 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
             document.getElementById('target-pace').textContent = secondsToPace(targetPaceSeconds);
             
             // Démarrer la simulation de course
-            startRun();
+            startRunWithCountdown();
         });
         
         // Gestion du changement de type de course
@@ -2730,7 +2801,7 @@ function loadTrainingPlan() {
                 document.getElementById('distance').textContent = "0.00";
                 document.getElementById('duration').textContent = "00:00";
                 document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i> Démarrer';
-                document.getElementById('pause-btn').onclick = startRun;
+                document.getElementById('pause-btn').onclick = startRunWithCountdown;
                 document.getElementById('stop-btn').disabled = true;
                 document.getElementById('pace-feedback').textContent = "Prêt à commencer";
             }
@@ -2806,7 +2877,7 @@ function loadTrainingPlan() {
     mapElement.innerHTML = '<div style="background-color: #e0e0e0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"><i class="fas fa-map-marker-alt" style="font-size: 2rem; color: #3498db;"></i><span style="margin-left: 10px;">Carte de suivi GPS</span></div>';
     
     // Définir le bouton pause/démarrer
-    document.getElementById('pause-btn').onclick = startRun;
+    document.getElementById('pause-btn').onclick = startRunWithCountdown;
     
     // Démarrer le stockage périodique des données
     setTimeout(storeRunDataPeriodically, 10000);

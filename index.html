@@ -189,6 +189,31 @@
             justify-content: space-around;
             margin-top: var(--spacing);
         }
+
+        #countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 4rem;
+            z-index: 1000;
+        }
+
+        .countdown-number {
+            animation: fadeNumber 1s forwards;
+        }
+
+        @keyframes fadeNumber {
+            0% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; transform: scale(1.2); }
+            100% { opacity: 0; transform: scale(0.5); }
+        }
         
         .big-metric {
             font-size: 3rem;
@@ -772,6 +797,9 @@
             
             <div class="voice-indicator hidden" id="voice-indicator">
                 <i class="fas fa-volume-up"></i>
+            </div>
+            <div id="countdown-overlay" class="hidden">
+                <span id="countdown-number"></span>
             </div>
         </div>
         
@@ -1611,8 +1639,8 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
     // Mettre à jour l'affichage du rythme cible
     document.getElementById('target-pace').textContent = session.pace;
     
-    // Démarrer la course
-    startRun();
+    // Démarrer la course avec compte à rebours
+    startRunWithCountdown();
 }
         
         // Mettre à jour l'affichage de la prochaine séance
@@ -2000,8 +2028,8 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
             
             document.getElementById('target-pace').textContent = secondsToPace(targetPaceSeconds);
             
-            // Démarrer la simulation de course
-            startRun();
+            // Démarrer la course avec compte à rebours
+            startRunWithCountdown();
         });
         
         // Gestion du changement de type de course
@@ -2497,6 +2525,39 @@ function storeRunDataPeriodically() {
     }
     
     setTimeout(storeRunDataPeriodically, 10000); // Toutes les 10 secondes
+}
+
+// Afficher un compte à rebours avant de démarrer la course
+function showCountdown(callback) {
+    const overlay = document.getElementById('countdown-overlay');
+    const numberEl = document.getElementById('countdown-number');
+    const sequence = ['3', '2', '1', 'Go!'];
+    let index = 0;
+
+    overlay.classList.remove('hidden');
+    numberEl.textContent = sequence[index];
+    numberEl.classList.add('countdown-number');
+
+    const interval = setInterval(() => {
+        index++;
+        if (index < sequence.length) {
+            numberEl.textContent = sequence[index];
+            numberEl.classList.remove('countdown-number');
+            void numberEl.offsetWidth;
+            numberEl.classList.add('countdown-number');
+        } else {
+            clearInterval(interval);
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                numberEl.classList.remove('countdown-number');
+                callback();
+            }, 500);
+        }
+    }, 1000);
+}
+
+function startRunWithCountdown() {
+    showCountdown(startRun);
 }
 
 // Récupérer les données de course interrompue

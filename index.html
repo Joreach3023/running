@@ -25,6 +25,40 @@
             --light-color: #ecf0f1;
             --spacing: 16px;
         }
+
+        body.dark-mode {
+            background-color: #121212;
+            color: var(--light-color);
+        }
+
+        body.dark-mode nav,
+        body.dark-mode .card {
+            background-color: #1e1e1e;
+            color: var(--light-color);
+        }
+
+        body.dark-mode nav button {
+            color: var(--light-color);
+        }
+
+        body.dark-mode nav button.active {
+            color: var(--secondary-color);
+            border-bottom-color: var(--secondary-color);
+        }
+
+        body.dark-mode .metric-box {
+            background-color: #2a2a2a;
+        }
+
+        body.dark-mode .form-control {
+            background-color: #2a2a2a;
+            color: var(--light-color);
+            border-color: #555;
+        }
+
+        body.dark-mode table {
+            color: var(--light-color);
+        }
         
         * {
             margin: 0;
@@ -47,6 +81,18 @@
             padding: var(--spacing);
             text-align: center;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        #theme-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 1.2rem;
+            cursor: pointer;
         }
         
         nav {
@@ -540,6 +586,7 @@
 </head>
 <body>
     <header>
+        <button id="theme-toggle" title="Changer de thème"><i class="fas fa-moon"></i></button>
         <h1>RunPacer</h1>
         <p id="header-objective">Atteignez votre objectif de 4:00 min/km</p>
     </header>
@@ -990,6 +1037,7 @@
     runs: [], // Historique des courses
     trainingPlan: [], // Plan d'entraînement généré
     customPlan: null // Stockera le plan personnalisé généré
+    ,theme: 'light'
 };
 
         // Variables pour le suivi en arrière-plan
@@ -1011,12 +1059,20 @@ let backgroundRunInterval;
         let currentRunType = "easy";
         let kmSplits = [];
         let currentKmStartTime = 0;
-        let currentKmStartDistance = 0;
-        let currentRouteImage = null;
-        // Ajouter ces variables en haut avec les autres :
+let currentKmStartDistance = 0;
+let currentRouteImage = null;
+// Ajouter ces variables en haut avec les autres :
 let intervalPhase = 'work'; // 'work' ou 'recovery'
 let intervalDistanceRemaining = 0;
 let currentTargetPace = "5:00"; // Valeur par défaut
+
+function applyTheme(theme) {
+    document.body.classList.toggle('dark-mode', theme === 'dark');
+    const toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+        toggle.innerHTML = theme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+    }
+}
         
        
 const runTypes = {
@@ -2683,10 +2739,19 @@ function loadTrainingPlan() {
         
         // Instructions vocales
         document.getElementById('voice-enabled').checked = userData.voiceEnabled;
-        
+
         // Mettre à jour l'affichage
         updateProfileDisplay();
+        applyTheme(userData.theme || 'light');
     }
+    else {
+        applyTheme(userData.theme);
+    }
+    document.getElementById('theme-toggle').addEventListener('click', function() {
+        userData.theme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+        applyTheme(userData.theme);
+        localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+    });
     
     // Charger le plan d'entraînement
     loadTrainingPlan();

@@ -2186,7 +2186,7 @@ function updateIntervalIndicator() {
                 
                 // Instruction vocale si nécessaire
                 if (userData.voiceEnabled && currentDuration - lastSpokenTime > 60) {
-                    const utterance = new SpeechSynthesisUtterance("Accélérez fénéasse, vous êtes trop lent.");
+                    const utterance = new SpeechSynthesisUtterance("Accélérez feignasse, vous êtes trop lent.");
                     utterance.lang = 'fr-FR';
                     speechSynthesis.speak(utterance);
                     lastSpokenTime = currentDuration;

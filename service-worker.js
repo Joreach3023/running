@@ -6,8 +6,6 @@ const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/css/styles.css',
-  '/js/app.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/webfonts/fa-solid-900.woff2',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',

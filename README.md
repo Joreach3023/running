@@ -19,3 +19,7 @@ $ xdg-open index.html  # or open the file in your browser of choice
 
 That's it—RunPacer is ready to use.
 
+
+## Confidentialite
+
+Consultez [PRIVACY.md](PRIVACY.md) pour connaitre notre politique de confidentialite.

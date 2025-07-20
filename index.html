@@ -1066,6 +1066,8 @@ let intervalPhase = 'work'; // 'work' ou 'recovery'
 let intervalDistanceRemaining = 0;
 let currentTargetPace = "5:00"; // Valeur par défaut
 
+const slowPhrases = ["Allez, on accélère !","Tu peux le faire, garde le rythme !","Courage, pousse un peu plus !","Ne lâche rien, continue !","Encore un effort, tu y es presque !"];
+
 function applyTheme(theme) {
     document.body.classList.toggle('dark-mode', theme === 'dark');
     const toggle = document.getElementById('theme-toggle');
@@ -2248,12 +2250,13 @@ function updateIntervalIndicator() {
                     }, 3000);
                 }
             } else if (currentPaceSeconds > targetPaceSeconds + 15) {
-                paceFeedback.textContent = "Accélérez un peu!";
+                const message = slowPhrases[Math.floor(Math.random()*slowPhrases.length)];
+                paceFeedback.textContent = message;
                 paceFeedback.className = "too-slow";
                 
                 // Instruction vocale si nécessaire
                 if (userData.voiceEnabled && currentDuration - lastSpokenTime > 60) {
-                    const utterance = new SpeechSynthesisUtterance("Accélérez feignasse, vous êtes trop lent.");
+                    const utterance = new SpeechSynthesisUtterance(message);
                     utterance.lang = 'fr-FR';
                     speechSynthesis.speak(utterance);
                     lastSpokenTime = currentDuration;

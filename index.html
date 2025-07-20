@@ -1404,6 +1404,7 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
             
             userData.trainingPlan = plan;
             updateTrainingPlanDisplay();
+            saveTrainingPlan();
         }
         
         // Mettre à jour l'affichage du plan d'entraînement
@@ -2481,17 +2482,7 @@ function loadTrainingPlan() {
   }
 }
 
-// Modifier la fonction generateTrainingPlan pour sauvegarder automatiquement
-function generateTrainingPlan() {
-  // ... (code existant)
-  saveTrainingPlan(); // Ajouter cette ligne à la fin
-}
-
-// Appeler loadTrainingPlan au chargement de la page
-window.addEventListener('DOMContentLoaded', function() {
-  // ... (code existant)
-  loadTrainingPlan(); // Ajouter cette ligne
-});
+// Appeler loadTrainingPlan au démarrage sera géré plus loin
         
         
         

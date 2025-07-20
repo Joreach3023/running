@@ -818,6 +818,11 @@
                         <input type="text" class="form-control" id="strava-token-input" placeholder="OAuth token">
                         <div class="form-hint">Générez un token depuis votre compte Strava</div>
                     </div>
+
+                    <div class="form-group">
+                        <button type="button" class="btn" id="strava-connect-btn"><i class="fab fa-strava"></i> Connecter Strava</button>
+                        <div id="strava-status" class="form-hint"></div>
+                    </div>
                     
                     <button type="submit" class="btn btn-success">Enregistrer les modifications</button>
                 </form>
@@ -1027,6 +1032,9 @@
 
     <script>
         // Configuration initiale
+        const STRAVA_CLIENT_ID = 'YOUR_CLIENT_ID';
+        const STRAVA_CLIENT_SECRET = 'YOUR_CLIENT_SECRET';
+        const STRAVA_REDIRECT_URI = window.location.origin + window.location.pathname;
         const userData = {
     currentPace: "4:36", // minutes:secondes par km
     targetPace: "4:00",
@@ -1034,6 +1042,8 @@
     trainingDays: ["tuesday", "thursday", "sunday"],
     voiceEnabled: true,
     stravaToken: "",
+    stravaRefreshToken: "",
+    stravaExpiresAt: 0,
     runs: [], // Historique des courses
     trainingPlan: [], // Plan d'entraînement généré
     customPlan: null // Stockera le plan personnalisé généré
@@ -1851,6 +1861,7 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
             userData.targetPace = document.getElementById('target-pace-input').value;
             userData.eventDate = document.getElementById('event-date-input').value;
             userData.stravaToken = document.getElementById('strava-token-input').value;
+            document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
             
             // Mettre à jour les jours d'entraînement
             userData.trainingDays = [];
@@ -2738,6 +2749,14 @@ function loadTrainingPlan() {
         document.getElementById('target-pace-input').value = userData.targetPace;
         document.getElementById('event-date-input').value = userData.eventDate;
         document.getElementById('strava-token-input').value = userData.stravaToken || '';
+        document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
+        document.getElementById('strava-connect-btn').onclick = connectStrava;
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('code')) {
+            exchangeStravaCode(params.get('code')).catch(e => alert('Erreur Strava: ' + e.message));
+            history.replaceState({}, '', window.location.pathname);
+        }
         
         // Jours d'entraînement
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -2883,14 +2902,62 @@ function loadTrainingPlan() {
             }
         }
 
+        function connectStrava() {
+            const url = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&scope=activity:write&approval_prompt=auto`;
+            window.location.href = url;
+        }
+
+        async function exchangeStravaCode(code) {
+            const params = new URLSearchParams();
+            params.append('client_id', STRAVA_CLIENT_ID);
+            params.append('client_secret', STRAVA_CLIENT_SECRET);
+            params.append('code', code);
+            params.append('grant_type', 'authorization_code');
+            const resp = await fetch('https://www.strava.com/oauth/token', {
+                method: 'POST',
+                body: params
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.message || 'Erreur');
+            userData.stravaToken = data.access_token;
+            userData.stravaRefreshToken = data.refresh_token;
+            userData.stravaExpiresAt = data.expires_at;
+            localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+            document.getElementById('strava-status').textContent = 'Connecté';
+        }
+
+        async function ensureStravaToken() {
+            if (!userData.stravaToken) return false;
+            const now = Math.floor(Date.now() / 1000);
+            if (userData.stravaExpiresAt && now >= userData.stravaExpiresAt - 60) {
+                const params = new URLSearchParams();
+                params.append('client_id', STRAVA_CLIENT_ID);
+                params.append('client_secret', STRAVA_CLIENT_SECRET);
+                params.append('grant_type', 'refresh_token');
+                params.append('refresh_token', userData.stravaRefreshToken);
+                const resp = await fetch('https://www.strava.com/oauth/token', {
+                    method: 'POST',
+                    body: params
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.message || 'Erreur');
+                userData.stravaToken = data.access_token;
+                userData.stravaRefreshToken = data.refresh_token;
+                userData.stravaExpiresAt = data.expires_at;
+                localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+            }
+            return true;
+        }
+
         async function publishToStrava(run) {
-            const token = userData.stravaToken;
-            if (!token) {
-                alert("Ajoutez votre token Strava dans le profil");
+            if (!userData.stravaToken) {
+                alert("Connectez votre compte Strava dans le profil");
                 return;
             }
 
             try {
+                await ensureStravaToken();
+                const token = userData.stravaToken;
                 if (run.gpsData && run.gpsData.length >= 2) {
                     const gpxContent = generateGPX(run);
                     const formData = new FormData();

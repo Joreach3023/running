@@ -1055,7 +1055,18 @@ const runTypes = {
             const secs = Math.floor(seconds % 60);
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         }
-        
+
+        // Convertir un rythme "mm:ss" en texte lisible pour la synthèse vocale
+        function paceToSpeech(pace) {
+            const [mins, secs] = pace.split(':').map(Number);
+            const minuteWord = mins > 1 ? 'minutes' : 'minute';
+            let result = `${mins} ${minuteWord}`;
+            if (secs > 0) {
+                result += ` ${secs}`;
+            }
+            return result;
+        }
+
         // Formater le temps en hh:mm:ss
         function formatTime(totalSeconds) {
             const hours = Math.floor(totalSeconds / 3600);
@@ -2074,7 +2085,8 @@ function updateIntervalIndicator() {
                         
                         // Instruction vocale pour le kilomètre parcouru
                         if (userData.voiceEnabled) {
-                            const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} en ${kmPace}`);
+                            const paceSpeech = paceToSpeech(kmPace);
+                            const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} en ${paceSpeech}`);
                             utterance.lang = 'fr-FR';
                             speechSynthesis.speak(utterance);
                             
@@ -2262,7 +2274,8 @@ function updateIntervalIndicator() {
     // Instruction vocale
     if (userData.voiceEnabled) {
         const runType = runTypes[currentRunType];
-        const utterance = new SpeechSynthesisUtterance(`Début de la ${runType.name.toLowerCase()}. Objectif: ${document.getElementById('target-pace').textContent} minutes par kilomètre.`);
+        const targetPaceSpeech = paceToSpeech(document.getElementById('target-pace').textContent);
+        const utterance = new SpeechSynthesisUtterance(`Début de la ${runType.name.toLowerCase()}. Objectif: ${targetPaceSpeech} par kilomètre.`);
         utterance.lang = 'fr-FR';
         speechSynthesis.speak(utterance);
         
@@ -2507,7 +2520,8 @@ window.addEventListener('DOMContentLoaded', function() {
                 if (currentKm > 0 && currentKm > Math.floor((simulatedDistance - 100) / 1000)) {
                     if (userData.voiceEnabled) {
                         const pace = secondsToPace(currentDuration / currentKm);
-const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} simulé en ${pace}`);
+                        const paceSpeech = paceToSpeech(pace);
+                        const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} simulé en ${paceSpeech}`);
                         utterance.lang = 'fr-FR';
                         speechSynthesis.speak(utterance);
                         
@@ -2587,7 +2601,8 @@ const utterance = new SpeechSynthesisUtterance(`Kilomètre ${currentKm} simulé 
                 
                 // Instruction vocale
                 if (userData.voiceEnabled) {
-                    const utterance = new SpeechSynthesisUtterance(`Fin de la course. Rythme moyen: ${avgPace} par kilomètre.`);
+                    const paceSpeech = paceToSpeech(avgPace);
+                    const utterance = new SpeechSynthesisUtterance(`Fin de la course. Rythme moyen: ${paceSpeech} par kilomètre.`);
                     utterance.lang = 'fr-FR';
                     speechSynthesis.speak(utterance);
                     

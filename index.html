@@ -854,7 +854,22 @@
                 <div class="card-title">Progression du rythme</div>
                 <canvas id="pace-chart" width="400" height="200"></canvas>
             </div>
-            
+
+            <div class="card">
+                <div class="card-title">Distances hebdomadaires</div>
+                <canvas id="weekly-distance-chart" width="400" height="200"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Histogramme des vitesses</div>
+                <canvas id="speed-histogram-chart" width="400" height="200"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Objectif mensuel</div>
+                <canvas id="monthly-goal-chart" width="200" height="200"></canvas>
+            </div>
+
             <div class="card">
                 <div class="card-title">Historique des courses</div>
                 <table class="table">
@@ -1158,6 +1173,7 @@
         const STRAVA_CLIENT_ID = '169011';
         const STRAVA_CLIENT_SECRET = '6e9f34aa96365b1daf849922ba15c9d003af824b';
         const STRAVA_REDIRECT_URI = window.location.origin + window.location.pathname;
+        const MONTHLY_GOAL_KM = 100; // objectif mensuel par défaut
         const userData = {
     currentPace: "4:36", // minutes:secondes par km
     targetPace: "4:00",
@@ -1771,8 +1787,11 @@ function updateGoalProgress() {
             document.getElementById('best-pace').textContent = bestPace;
             document.getElementById('avg-pace').textContent = avgPace;
             
-            // Mettre à jour le graphique
+            // Mettre à jour les graphiques
             updatePaceChart();
+            updateWeeklyDistanceChart();
+            updateSpeedHistogramChart();
+            updateMonthlyGoalChart();
         }
         
         // Mettre à jour le graphique de progression du rythme
@@ -1825,6 +1844,131 @@ function updateGoalProgress() {
                                     text: 'Date'
                                 }
                             }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Mettre à jour la courbe des distances hebdomadaires
+        function updateWeeklyDistanceChart() {
+            const ctx = document.getElementById('weekly-distance-chart').getContext('2d');
+
+            const weeks = {};
+            userData.runs.forEach(run => {
+                const d = new Date(run.date);
+                const day = d.getDay();
+                const diff = d.getDate() - day + (day === 0 ? -6 : 1); // lundi
+                const monday = new Date(d.setDate(diff));
+                const key = monday.toISOString().split('T')[0];
+                weeks[key] = (weeks[key] || 0) + parseFloat(run.distance);
+            });
+
+            const sorted = Object.keys(weeks).sort();
+            const labels = sorted.map(date => new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }));
+            const distances = sorted.map(date => weeks[date].toFixed(1));
+
+            if (window.weeklyDistanceChart) {
+                weeklyDistanceChart.data.labels = labels;
+                weeklyDistanceChart.data.datasets[0].data = distances;
+                weeklyDistanceChart.update();
+            } else {
+                window.weeklyDistanceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Distance hebdomadaire (km)',
+                            data: distances,
+                            borderColor: '#2ecc71',
+                            backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Mettre à jour l'histogramme des vitesses
+        function updateSpeedHistogramChart() {
+            const ctx = document.getElementById('speed-histogram-chart').getContext('2d');
+            const bins = {};
+            userData.runs.forEach(run => {
+                const [mins, secs] = run.pace.split(':').map(Number);
+                const speed = 60 / (mins + secs / 60);
+                const bin = Math.floor(speed);
+                bins[bin] = (bins[bin] || 0) + 1;
+            });
+
+            const sorted = Object.keys(bins).sort((a,b) => a - b);
+            const labels = sorted.map(b => `${b}-${parseInt(b)+1} km/h`);
+            const values = sorted.map(b => bins[b]);
+
+            if (window.speedHistogramChart) {
+                speedHistogramChart.data.labels = labels;
+                speedHistogramChart.data.datasets[0].data = values;
+                speedHistogramChart.update();
+            } else {
+                window.speedHistogramChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Nombre de courses',
+                            data: values,
+                            backgroundColor: '#e67e22'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+        }
+
+        // Mettre à jour le cercle de progression mensuel
+        function updateMonthlyGoalChart() {
+            const ctx = document.getElementById('monthly-goal-chart').getContext('2d');
+            const now = new Date();
+            let monthDistance = 0;
+            userData.runs.forEach(run => {
+                const d = new Date(run.date);
+                if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+                    monthDistance += parseFloat(run.distance);
+                }
+            });
+
+            const done = Math.min(monthDistance, MONTHLY_GOAL_KM);
+            const remaining = Math.max(MONTHLY_GOAL_KM - done, 0);
+
+            if (window.monthlyGoalChart) {
+                monthlyGoalChart.data.datasets[0].data = [done, remaining];
+                monthlyGoalChart.options.plugins.title.text = `${done.toFixed(1)} / ${MONTHLY_GOAL_KM} km`;
+                monthlyGoalChart.update();
+            } else {
+                window.monthlyGoalChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Réalisé', 'Restant'],
+                        datasets: [{
+                            data: [done, remaining],
+                            backgroundColor: ['#3498db', '#ecf0f1'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: true, text: `${done.toFixed(1)} / ${MONTHLY_GOAL_KM} km` }
                         }
                     }
                 });
@@ -3001,6 +3145,9 @@ function loadTrainingPlan() {
     
     // Démarrer le stockage périodique des données
     setTimeout(storeRunDataPeriodically, 10000);
+
+    // Afficher l'historique et les statistiques existants
+    updateHistory();
 });
 
         // Service Worker pour la fonctionnalité PWA

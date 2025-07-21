@@ -2,6 +2,7 @@
   "name": "RunPacer",
   "short_name": "RunPacer",
   "start_url": "index.html",
+  "orientation": "portrait",
   "display": "standalone",
   "background_color": "#3498db",
   "theme_color": "#3498db",

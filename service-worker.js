@@ -1,5 +1,5 @@
 // Nom du cache
-const CACHE_NAME = 'runpacer-cache-v3';
+const CACHE_NAME = 'runpacer-cache-v4';
 
 // Fichiers à mettre en cache
 const urlsToCache = [
@@ -11,7 +11,8 @@ const urlsToCache = [
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png'
+  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
 // Installation du service worker

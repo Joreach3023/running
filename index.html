@@ -537,6 +537,21 @@
 .session-easy { color: var(--secondary-color); }
 .session-interval { color: var(--warning-color); }
 .session-rest { color: #7f8c8d; }
+.completed-session td {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+.calendar-day.completed {
+    position: relative;
+    background-color: #e9ecef;
+}
+.calendar-day.completed .done-star {
+    position: absolute;
+    top: 0;
+    right: 2px;
+    color: gold;
+    font-size: 0.75rem;
+}
 .progress-container {
     margin-bottom: 8px;
 }
@@ -1633,6 +1648,9 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
         const tr = document.createElement('tr');
         tr.style.cursor = 'pointer';
         tr.addEventListener('click', () => startSelectedSession(index));
+        if (session.completed) {
+            tr.classList.add('completed-session');
+        }
         
         const date = new Date(session.date);
         const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
@@ -1654,8 +1672,16 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
 }
 
 
-        function startSelectedSession(sessionIndex) {
+function startSelectedSession(sessionIndex) {
     const session = userData.trainingPlan[sessionIndex];
+
+    if (session.completed) {
+        const runIndex = userData.runs.findIndex(r => r.date === session.date && r.type === session.type);
+        if (runIndex !== -1) {
+            showRunDetails(runIndex);
+            return;
+        }
+    }
 
     // Retirer la sélection précédente
     document.querySelectorAll('#full-plan-table tr').forEach(tr => {
@@ -1750,7 +1776,11 @@ function renderTrainingCalendar() {
         }
         const cell = document.createElement('div');
         cell.className = 'calendar-day';
-        cell.innerHTML = `<span class="session-icon ${cls}">${icon}</span>${d.getDate()}`;
+        if (session && session.completed) {
+            cell.classList.add('completed');
+        }
+        const star = session && session.completed ? '<span class="done-star">⭐</span>' : '';
+        cell.innerHTML = `<span class="session-icon ${cls}">${icon}</span>${d.getDate()}${star}`;
         cal.appendChild(cell);
     }
 }

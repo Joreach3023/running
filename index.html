@@ -21,6 +21,7 @@
             --primary-color: #3498db;
             --secondary-color: #2ecc71;
             --warning-color: #e74c3c;
+            --strava-color: #fc4c02;
             --dark-color: #2c3e50;
             --light-color: #ecf0f1;
             --spacing: 16px;
@@ -180,9 +181,13 @@
         .btn-warning {
             background-color: var(--warning-color);
         }
-        
+
         .btn-success {
             background-color: var(--secondary-color);
+        }
+
+        .btn-strava {
+            background-color: var(--strava-color);
         }
         
         .run-controls {
@@ -703,7 +708,7 @@
     <nav>
         <button id="nav-plan" class="active"><i class="fas fa-calendar-alt"></i> Plan</button>
         <button id="nav-run"><i class="fas fa-running"></i> Courir</button>
-        <button id="nav-stats"><i class="fas fa-chart-line"></i> Stats</button>
+        <button id="nav-stats" style="color: var(--primary-color);" title="Voir stats">📊</button>
         <button id="nav-profile"><i class="fas fa-user"></i> Profil</button>
         <button id="nav-create-plan"><i class="fas fa-calendar-plus"></i> Créer plan</button>
     </nav>
@@ -726,7 +731,7 @@
                     <p>Distance: <strong id="next-session-distance">5 km</strong></p>
                     <p>Rythme cible: <strong id="next-session-pace">5:00 min/km</strong></p>
                     <p id="next-session-goal">Objectif: Récupération active, travail cardiovasculaire léger</p>
-                    <button class="btn" id="start-run-btn"><i class="fas fa-play"></i> Commencer la séance</button>
+                    <button class="btn btn-success" id="start-run-btn" title="Démarrer la course"><i class="fas fa-play"></i></button>
                 </div>
             </div>
             <div class="card">
@@ -815,8 +820,8 @@
             </div>
             
             <div class="run-controls">
-                <button class="btn btn-lg" id="pause-btn"><i class="fas fa-play"></i> Démarrer</button>
-                <button class="btn btn-lg btn-warning" id="stop-btn" disabled><i class="fas fa-stop"></i> Arrêter</button>
+                <button class="btn btn-lg btn-success" id="pause-btn" title="Démarrer la course"><i class="fas fa-play"></i></button>
+                <button class="btn btn-lg btn-warning" id="stop-btn" disabled><i class="fas fa-stop"></i></button>
             </div>
             
             <div class="voice-indicator hidden" id="voice-indicator">
@@ -938,7 +943,7 @@
                     </div>
 
                     <div class="form-group">
-                        <button type="button" class="btn" id="strava-connect-btn"><i class="fab fa-strava"></i> Connecter Strava</button>
+                        <button type="button" class="btn btn-strava" id="strava-connect-btn" title="Connecter Strava"><i class="fas fa-link"></i></button>
                         <div id="strava-status" class="form-hint"></div>
                     </div>
                     
@@ -2511,7 +2516,7 @@ function updateIntervalIndicator() {
     document.getElementById('pace-feedback').className = "good-pace";
     
     // Activer/désactiver les boutons
-    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i> Pause';
+    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
     document.getElementById('pause-btn').onclick = pauseRun;
     document.getElementById('stop-btn').disabled = false;
     
@@ -2791,7 +2796,7 @@ function loadTrainingPlan() {
     stopGpsTracking();
     
     // Mettre à jour l'affichage des boutons
-    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i> Reprendre';
+    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i>';
     document.getElementById('pause-btn').onclick = resumeRun;
     document.getElementById('pace-feedback').textContent = "Course en pause";
     
@@ -2814,7 +2819,7 @@ function loadTrainingPlan() {
             startGpsTracking();
             
             // Mettre à jour l'affichage des boutons
-            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i> Pause';
+            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
             document.getElementById('pause-btn').onclick = pauseRun;
             document.getElementById('pace-feedback').textContent = "Course en cours...";
             
@@ -2834,7 +2839,7 @@ function loadTrainingPlan() {
         
         // Fonction pour arrêter la course
         document.getElementById('stop-btn').addEventListener('click', async function() {
-            if (isRunning || document.getElementById('pause-btn').innerHTML.includes('Reprendre')) {
+            if (isRunning || document.getElementById('pause-btn').innerHTML.includes('fa-play')) {
                 clearInterval(runInterval);
                 stopGpsTracking();
                 
@@ -2915,7 +2920,7 @@ function loadTrainingPlan() {
                 document.getElementById('current-pace').textContent = "--:--";
                 document.getElementById('distance').textContent = "0.00";
                 document.getElementById('duration').textContent = "00:00";
-                document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i> Démarrer';
+                document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i>';
                 document.getElementById('pause-btn').onclick = startRun;
                 document.getElementById('stop-btn').disabled = true;
                 document.getElementById('pace-feedback').textContent = "Prêt à commencer";

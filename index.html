@@ -1684,12 +1684,19 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
 function startSelectedSession(sessionIndex) {
     const session = userData.trainingPlan[sessionIndex];
 
+    if (!session) return;
+
     if (session.completed) {
         const runIndex = userData.runs.findIndex(r => r.date === session.date && r.type === session.type);
         if (runIndex !== -1) {
             showRunDetails(runIndex);
             return;
         }
+    }
+
+    const confirmMsg = `D\u00e9marrer la s\u00e9ance du ${new Date(session.date).toLocaleDateString('fr-FR')} ?`;
+    if (!confirm(confirmMsg)) {
+        return;
     }
 
     // Retirer la sélection précédente
@@ -1771,7 +1778,8 @@ function renderTrainingCalendar() {
     }
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dateStr = d.toISOString().split('T')[0];
-        const session = userData.trainingPlan.find(s => s.date === dateStr);
+        const sessionIndex = userData.trainingPlan.findIndex(s => s.date === dateStr);
+        const session = userData.trainingPlan[sessionIndex];
         let icon = '😴';
         let cls = 'session-rest';
         if (session) {
@@ -1790,6 +1798,22 @@ function renderTrainingCalendar() {
         }
         const star = session && session.completed ? '<span class="done-star">⭐</span>' : '';
         cell.innerHTML = `<span class="session-icon ${cls}">${icon}</span>${d.getDate()}${star}`;
+        if (session) {
+            if (session.completed) {
+                const runIndex = userData.runs.findIndex(r => r.date === session.date && r.type === session.type);
+                if (runIndex !== -1) {
+                    cell.addEventListener('click', () => showRunDetails(runIndex));
+                }
+            } else {
+                cell.addEventListener('click', () => {
+                    startSelectedSession(sessionIndex);
+                });
+            }
+        } else {
+            cell.addEventListener('click', () => {
+                alert("Bon repos ! Le repos est essentiel pour progresser.");
+            });
+        }
         cal.appendChild(cell);
     }
 }

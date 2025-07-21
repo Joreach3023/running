@@ -1892,7 +1892,7 @@ function updateGoalProgress() {
 }
         // Mettre à jour les statistiques affichées
         function updateStats() {
-            if (userData.runs.length === 0) return;
+            if (userData.runs.length === 0 || typeof Chart === 'undefined') return;
             
             // Calculer les totaux
             const totalRuns = userData.runs.length;
@@ -1918,6 +1918,7 @@ function updateGoalProgress() {
         
         // Mettre à jour le graphique de progression du rythme
         function updatePaceChart() {
+            if (typeof Chart === 'undefined') return;
             const ctx = document.getElementById('pace-chart').getContext('2d');
             
             // Trier les courses par date
@@ -1974,6 +1975,7 @@ function updateGoalProgress() {
 
         // Mettre à jour la courbe des distances hebdomadaires
         function updateWeeklyDistanceChart() {
+            if (typeof Chart === 'undefined') return;
             const ctx = document.getElementById('weekly-distance-chart').getContext('2d');
 
             const weeks = {};
@@ -2020,6 +2022,7 @@ function updateGoalProgress() {
 
         // Mettre à jour l'histogramme des vitesses
         function updateSpeedHistogramChart() {
+            if (typeof Chart === 'undefined') return;
             const ctx = document.getElementById('speed-histogram-chart').getContext('2d');
             const bins = {};
             userData.runs.forEach(run => {
@@ -2058,6 +2061,7 @@ function updateGoalProgress() {
 
         // Mettre à jour le cercle de progression mensuel
         function updateMonthlyGoalChart() {
+            if (typeof Chart === 'undefined') return;
             const ctx = document.getElementById('monthly-goal-chart').getContext('2d');
             const now = new Date();
             let monthDistance = 0;

@@ -1,10 +1,11 @@
 // Nom du cache
-const CACHE_NAME = 'runpacer-cache-v4';
+const CACHE_NAME = 'runpacer-cache-v5';
 
 // Fichiers à mettre en cache
 const urlsToCache = [
   './',
   'index.html',
+  'utils.js',
   'manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/webfonts/fa-solid-900.woff2',

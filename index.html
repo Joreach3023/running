@@ -12,7 +12,7 @@
     <script src="utils.js"></script>
     
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RunPacer - Votre Coach de Course</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     <link rel="manifest" href="manifest.json">
@@ -74,6 +74,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            touch-action: manipulation;
         }
         
         header {
@@ -3385,6 +3386,9 @@ function loadTrainingPlan() {
                     splash.classList.add('fade-out');
                     setTimeout(() => splash.remove(), 600);
                 }, 1500);
+            }
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('portrait').catch(() => {});
             }
         });
     </script>

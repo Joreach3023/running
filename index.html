@@ -1137,9 +1137,11 @@ let backgroundRunInterval;
         let lastSpokenTime = 0;
         let currentRunType = "easy";
         let kmSplits = [];
-        let currentKmStartTime = 0;
+let currentKmStartTime = 0;
 let currentKmStartDistance = 0;
 let currentRouteImage = null;
+let runStartTime = null; // ISO string du début de la course
+let runStartTimestamp = 0; // Timestamp en ms pour la persistance
 // Ajouter ces variables en haut avec les autres :
 let intervalPhase = 'work'; // 'work' ou 'recovery'
 let intervalDistanceRemaining = 0;
@@ -2354,8 +2356,12 @@ function updateIntervalIndicator() {
         }
         
         // Fonction pour démarrer la course
-        async function startRun() {
+        async function startRun(resume = false) {
     // Réinitialiser les variables
+    if (!resume) {
+        runStartTimestamp = Date.now();
+        runStartTime = new Date(runStartTimestamp).toISOString();
+    }
     isRunning = true;
     currentDuration = 0;
     distanceTraveled = 0;
@@ -2431,7 +2437,7 @@ function updateIntervalIndicator() {
             
             // Stocker les données de course pour l'arrière-plan
             const runData = {
-                startTime: new Date().getTime(),
+                startTime: runStartTimestamp,
                 runType: currentRunType,
                 targetPace: currentTargetPace,
                 locations: []
@@ -2477,7 +2483,7 @@ function storeRunDataPeriodically() {
     if (!isRunning) return;
     
     const runData = {
-        startTime: new Date().getTime() - (currentDuration * 1000),
+        startTime: runStartTimestamp,
         currentDuration: currentDuration,
         distanceTraveled: distanceTraveled,
         locations: locationData,
@@ -2519,7 +2525,9 @@ function recoverInterruptedRun() {
                 currentTargetPace = runData.targetPace || userData.targetPace;
                 
                 // Redémarrer la course
-                startRun();
+                runStartTimestamp = runData.startTime;
+                runStartTime = new Date(runData.startTime).toISOString();
+                startRun(true);
                 
                 // Mettre à jour l'affichage
                 document.getElementById('distance').textContent = (distanceTraveled / 1000).toFixed(2);
@@ -2580,7 +2588,9 @@ navigator.serviceWorker.addEventListener('message', event => {
     if (runData.locations.length > 0) {
       locationData = runData.locations;
       distanceTraveled = calculateTotalDistance(runData.locations);
-      currentDuration = Math.floor((new Date().getTime() - runData.startTime) / 1000);
+      runStartTimestamp = runData.startTime;
+      runStartTime = new Date(runData.startTime).toISOString();
+      currentDuration = Math.floor((Date.now() - runStartTimestamp) / 1000);
       
       // Mettre à jour l'affichage
       document.getElementById('distance').textContent = (distanceTraveled / 1000).toFixed(2);
@@ -2755,7 +2765,8 @@ function loadTrainingPlan() {
                 // Sauvegarder la course seulement si une distance a été parcourue
                 if (distanceTraveled > 0 || currentDuration > 60) {
                     const newRun = {
-                        date: new Date().toISOString().split('T')[0],
+                        date: new Date(runStartTime).toISOString().split('T')[0],
+                        startTime: runStartTime,
                         type: currentRunType,
                         typeName: runTypes[currentRunType].name,
                         distance: (distanceTraveled > 0 ? (distanceTraveled / 1000) : (currentDuration / paceToSeconds(avgPace))).toFixed(2),
@@ -2909,7 +2920,7 @@ function loadTrainingPlan() {
 <gpx version="1.1" creator="RunPacer App" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
     <name>RunPacer - Course du ${run.date}</name>
-    <time>${new Date(run.date).toISOString()}</time>
+    <time>${new Date(run.startTime || run.date).toISOString()}</time>
   </metadata>
   <trk>
     <name>Course ${run.type} - ${run.distance}km</name>
@@ -3048,7 +3059,8 @@ function loadTrainingPlan() {
                     const params = new URLSearchParams();
                     params.append('name', `RunPacer ${run.distance}km`);
                     params.append('type', 'Run');
-                    params.append('start_date_local', run.date + 'T00:00:00');
+                    const startLocal = run.startTime || (run.date + 'T00:00:00');
+                    params.append('start_date_local', startLocal);
                     params.append('elapsed_time', Math.round(run.duration));
                     params.append('description', `Rythme ${run.pace}/km via RunPacer`);
                     params.append('distance', Math.round(parseFloat(run.distance) * 1000));

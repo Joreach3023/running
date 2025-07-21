@@ -505,6 +505,34 @@
     background-color: rgba(52, 152, 219, 0.1);
     transition: background-color 0.2s ease;
 }
+/* Calendrier d'entraînement */
+#plan-calendar {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-top: 8px;
+}
+.calendar-day {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 2px 0;
+    font-size: 0.75rem;
+}
+.session-icon {
+    display: block;
+    font-size: 1rem;
+}
+.session-easy { color: var(--secondary-color); }
+.session-interval { color: var(--warning-color); }
+.session-rest { color: #7f8c8d; }
+.progress-container {
+    margin-bottom: 8px;
+}
+#goal-progress {
+    width: 100%;
+    height: 12px;
+}
+
         
         /* Styles pour les statistiques d'élévation */
         .elevation-chart {
@@ -689,6 +717,15 @@
                     <button class="btn" id="start-run-btn"><i class="fas fa-play"></i> Commencer la séance</button>
                 </div>
             </div>
+            <div class="card">
+                <div class="card-title">Calendrier</div>
+                <div class="progress-container">
+                    <progress id="goal-progress" value="0" max="100"></progress>
+                    <div id="progress-text">0%</div>
+                </div>
+                <div id="plan-calendar"></div>
+            </div>
+
             
             <div class="card">
                 <div class="card-title">Programme complet</div>
@@ -1579,6 +1616,8 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
     });
     
     updateNextSession();
+    renderTrainingCalendar();
+    updateGoalProgress();
 }
 
 
@@ -1641,6 +1680,61 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
             }
         }
         
+function renderTrainingCalendar() {
+    const cal = document.getElementById('plan-calendar');
+    if (!cal) return;
+    cal.innerHTML = '';
+    if (userData.trainingPlan.length === 0) return;
+    const days = ['Lu','Ma','Me','Je','Ve','Sa','Di'];
+    days.forEach(d => {
+        const head = document.createElement('div');
+        head.className = 'calendar-day';
+        head.style.fontWeight = 'bold';
+        head.textContent = d;
+        cal.appendChild(head);
+    });
+    const start = new Date(userData.trainingPlan[0].date);
+    const end = new Date(userData.eventDate);
+    const offset = (start.getDay() + 6) % 7;
+    for (let i = 0; i < offset; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'calendar-day';
+        cal.appendChild(empty);
+    }
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        const session = userData.trainingPlan.find(s => s.date === dateStr);
+        let icon = '😴';
+        let cls = 'session-rest';
+        if (session) {
+            if (session.type === 'interval') {
+                icon = '⚡';
+                cls = 'session-interval';
+            } else {
+                icon = '🐢';
+                cls = 'session-easy';
+            }
+        }
+        const cell = document.createElement('div');
+        cell.className = 'calendar-day';
+        cell.innerHTML = `<span class="session-icon ${cls}">${icon}</span>${d.getDate()}`;
+        cal.appendChild(cell);
+    }
+}
+
+function updateGoalProgress() {
+    const progressEl = document.getElementById('goal-progress');
+    const textEl = document.getElementById('progress-text');
+    if (!progressEl || !textEl || !userData.eventDate) return;
+    const start = userData.trainingPlan.length ? new Date(userData.trainingPlan[0].date) : new Date();
+    const end = new Date(userData.eventDate);
+    const now = new Date();
+    const total = end - start;
+    const done = now - start;
+    const percent = total > 0 ? Math.min(100, Math.max(0, Math.round((done / total) * 100))) : 0;
+    progressEl.value = percent;
+    textEl.textContent = percent + '%';
+}
         // Mettre à jour les statistiques affichées
         function updateStats() {
             if (userData.runs.length === 0) return;

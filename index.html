@@ -1369,6 +1369,44 @@ const runTypes = {
             return result;
         }
 
+        // Faire vibrer l'appareil si possible
+        function vibratePhone() {
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]);
+            }
+        }
+
+        // Annoncer la phase d'intervalle avec rythme et distance
+        function announceInterval(phase) {
+            if (!userData.voiceEnabled) return;
+            const distance = phase === 'work'
+                ? runTypes[currentRunType].intervalDuration
+                : runTypes[currentRunType].recoveryDuration;
+            const paceSpeech = paceToSpeech(currentTargetPace);
+            const label = phase === 'work' ? 'Intervalle rapide' : 'Récupération';
+            const utterance = new SpeechSynthesisUtterance(`${label}. Courez à ${paceSpeech} par kilomètre pendant ${distance} mètres.`);
+            utterance.lang = 'fr-FR';
+            speechSynthesis.speak(utterance);
+
+            document.getElementById('voice-indicator').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('voice-indicator').classList.add('hidden');
+            }, 3000);
+        }
+
+        // Mettre à jour l'indicateur d'intervalle à l'écran
+        function updateIntervalIndicator() {
+            if (runTypes[currentRunType].isInterval) {
+                document.getElementById('interval-indicator').classList.remove('hidden');
+                document.getElementById('interval-phase').textContent =
+                    intervalPhase === 'work' ? 'Intervalle rapide' : 'Récupération';
+                document.getElementById('interval-distance').textContent =
+                    `Distance restante: ${Math.round(intervalDistanceRemaining)} m`;
+            } else {
+                document.getElementById('interval-indicator').classList.add('hidden');
+            }
+        }
+
         // Formater le temps en hh:mm:ss
         function formatTime(totalSeconds) {
             const hours = Math.floor(totalSeconds / 3600);
@@ -2537,49 +2575,31 @@ function updateGoalProgress() {
         // Gestion spécifique des intervalles
         if (runTypes[currentRunType].isInterval) {
             intervalDistanceRemaining -= segmentDistance;
-            
+
             // Vérifier si on doit changer de phase
             if (intervalDistanceRemaining <= 0) {
                 if (intervalPhase === 'work') {
                     intervalPhase = 'recovery';
                     intervalDistanceRemaining = runTypes[currentRunType].recoveryDuration;
-                    currentTargetPace = secondsToPace(paceToSeconds(userData.currentPace) + 
-                                       runTypes[currentRunType].recoveryPaceOffset * 60);
-                    
-                    // Annonce vocale
-                    if (userData.voiceEnabled) {
-                        const utterance = new SpeechSynthesisUtterance("Récupération");
-                        utterance.lang = 'fr-FR';
-                        speechSynthesis.speak(utterance);
-                    }
+                    currentTargetPace = secondsToPace(
+                        paceToSeconds(userData.currentPace) +
+                        runTypes[currentRunType].recoveryPaceOffset * 60
+                    );
                 } else {
                     intervalPhase = 'work';
                     intervalDistanceRemaining = runTypes[currentRunType].intervalDuration;
-                    currentTargetPace = secondsToPace(paceToSeconds(userData.currentPace) + 
-                                       runTypes[currentRunType].paceOffset * 60);
-                    
-                    // Annonce vocale
-                    if (userData.voiceEnabled) {
-                        const utterance = new SpeechSynthesisUtterance("Intervalle rapide");
-                        utterance.lang = 'fr-FR';
-                        speechSynthesis.speak(utterance);
-                    }
+                    currentTargetPace = secondsToPace(
+                        paceToSeconds(userData.currentPace) +
+                        runTypes[currentRunType].paceOffset * 60
+                    );
                 }
+
+                vibratePhone();
+                announceInterval(intervalPhase);
             }
 
-            // Ajouter ce code pour mettre à jour l'indicateur :
-function updateIntervalIndicator() {
-    if (runTypes[currentRunType].isInterval) {
-        document.getElementById('interval-indicator').classList.remove('hidden');
-        document.getElementById('interval-phase').textContent = 
-            intervalPhase === 'work' ? 'Intervalle rapide' : 'Récupération';
-        document.getElementById('interval-distance').textContent = 
-            `Distance restante: ${Math.round(intervalDistanceRemaining)} m`;
-    } else {
-        document.getElementById('interval-indicator').classList.add('hidden');
-    }
-}
-               // Mettre à jour l'affichage du rythme cible
+            updateIntervalIndicator();
+            // Mettre à jour l'affichage du rythme cible
             document.getElementById('target-pace').textContent = currentTargetPace;
         }
             
@@ -2761,7 +2781,9 @@ function updateIntervalIndicator() {
     if (runTypes[currentRunType].isInterval) {
         intervalPhase = 'work';
         intervalDistanceRemaining = runTypes[currentRunType].intervalDuration;
-        
+
+        updateIntervalIndicator();
+
         // Première annonce
         if (userData.voiceEnabled) {
             const utterance = new SpeechSynthesisUtterance("Début des intervalles. Premier intervalle rapide.");

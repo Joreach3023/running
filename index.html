@@ -2844,20 +2844,20 @@ function updateGoalProgress() {
         
         // Fonction pour démarrer la course
         async function startRun(resume = false) {
-    // Réinitialiser les variables
+    // Réinitialiser les variables uniquement pour une nouvelle course
     if (!resume) {
         runStartTimestamp = Date.now();
         runStartTime = new Date(runStartTimestamp).toISOString();
+        currentDuration = 0;
+        distanceTraveled = 0;
+        locationData = [];
+        previousLocation = null;
+        kmSplits = [];
+        currentKmStartTime = 0;
+        currentKmStartDistance = 0;
+        currentRouteImage = null;
     }
     isRunning = true;
-    currentDuration = 0;
-    distanceTraveled = 0;
-    locationData = [];
-    previousLocation = null;
-    kmSplits = [];
-    currentKmStartTime = 0;
-    currentKmStartDistance = 0;
-    currentRouteImage = null;
 
     // Utiliser le rythme cible de la session sélectionnée
     const targetPace = document.getElementById('target-pace').textContent;
@@ -2881,17 +2881,19 @@ function updateGoalProgress() {
     // Initialiser la carte
     initializeMap();
     
-    // Nettoyer le parcours précédent sur la carte
-    if (window.routeLayer) {
+    // Nettoyer le parcours précédent sur la carte uniquement pour une nouvelle course
+    if (!resume && window.routeLayer) {
         window.routeLayer.clearLayers();
     }
-    
-    // Réinitialiser l'affichage
-    document.getElementById('current-pace').textContent = "--:--";
-    document.getElementById('distance').textContent = "0.00";
-    document.getElementById('duration').textContent = "00:00";
-    document.getElementById('pace-feedback').textContent = "Course en cours...";
-    document.getElementById('pace-feedback').className = "good-pace";
+
+    // Réinitialiser l'affichage pour une nouvelle course
+    if (!resume) {
+        document.getElementById('current-pace').textContent = "--:--";
+        document.getElementById('distance').textContent = "0.00";
+        document.getElementById('duration').textContent = "00:00";
+        document.getElementById('pace-feedback').textContent = "Course en cours...";
+        document.getElementById('pace-feedback').className = "good-pace";
+    }
     
     // Activer/désactiver les boutons
     document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i>';

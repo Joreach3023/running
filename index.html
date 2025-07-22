@@ -977,6 +977,19 @@
                 <div class="card-title">Mes informations</div>
                 <form id="profile-form">
                     <div class="form-group">
+                        <label for="profile-name-input">Prénom</label>
+                        <input type="text" class="form-control" id="profile-name-input" placeholder="Votre prénom">
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-run-habit">Habitude de course</label>
+                        <select id="profile-run-habit" class="form-control">
+                            <option value="debutant">Débutant</option>
+                            <option value="occasionnel">Occasionnel</option>
+                            <option value="regulier">Régulier</option>
+                            <option value="course">Course spécifique</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="current-pace-input">Rythme actuel</label>
                         <input type="text" class="form-control" id="current-pace-input" value="4:36" placeholder="min:sec">
                         <div class="form-hint">Votre rythme actuel sur 10km</div>
@@ -1258,6 +1271,7 @@
         const MONTHLY_GOAL_KM = 100; // objectif mensuel par défaut
         const userData = {
     firstName: '',
+    runHabit: 'debutant',
     currentPace: "4:36", // minutes:secondes par km
     targetPace: "4:00",
     eventDate: "2025-06-07",
@@ -2347,6 +2361,8 @@ function updateGoalProgress() {
             e.preventDefault();
             
             // Mettre à jour les données utilisateur
+            userData.firstName = document.getElementById('profile-name-input').value.trim();
+            userData.runHabit = document.getElementById('profile-run-habit').value;
             userData.currentPace = document.getElementById('current-pace-input').value;
             userData.targetPace = document.getElementById('target-pace-input').value;
             userData.eventDate = document.getElementById('event-date-input').value;
@@ -3234,6 +3250,8 @@ function loadTrainingPlan() {
         document.getElementById('strava-token-input').value = userData.stravaToken || '';
         document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
         document.getElementById('strava-connect-btn').onclick = connectStrava;
+        document.getElementById('profile-name-input').value = userData.firstName || '';
+        document.getElementById('profile-run-habit').value = userData.runHabit || 'debutant';
 
         const params = new URLSearchParams(window.location.search);
         if (params.has('code')) {
@@ -3253,9 +3271,11 @@ function loadTrainingPlan() {
         // Mettre à jour l'affichage
         updateProfileDisplay();
         applyTheme(userData.theme || 'light');
-    }
+    }    
     else {
         applyTheme(userData.theme);
+        document.getElementById('profile-name-input').value = userData.firstName;
+        document.getElementById('profile-run-habit').value = userData.runHabit;
     }
     document.getElementById('theme-toggle').addEventListener('click', function() {
         userData.theme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
@@ -3312,7 +3332,11 @@ function loadTrainingPlan() {
         }
         showOnboardingStep(1);
     };
-    document.getElementById('onboard-next-2').onclick = () => showOnboardingStep(2);
+    document.getElementById('onboard-next-2').onclick = () => {
+        const habit = document.querySelector('input[name="run-habit"]:checked').value;
+        userData.runHabit = habit;
+        showOnboardingStep(2);
+    };
     document.getElementById('onboard-next-3').onclick = () => showOnboardingStep(3);
     document.getElementById('onboard-create').onclick = () => {
         onboardingOverlay.classList.remove('active');

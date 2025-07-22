@@ -2598,7 +2598,7 @@ function updateGoalProgress() {
                 const speedMps = segmentDistance / timeElapsed;
                 
                 // Ignorer les points aberrants (vitesse > 10 m/s ou 36 km/h)
-                if (segmentDistance > 1 && speedMps < 10) {
+                if (segmentDistance > 0 && speedMps < 10) {
         distanceTraveled += segmentDistance;
         
         // Gestion spécifique des intervalles
@@ -2696,9 +2696,10 @@ function updateGoalProgress() {
                         updatePaceFeedback(currentPaceSeconds * 60); // Convertir en secondes
                     }
                     
-                    // Mettre à jour la carte
-                    updateMap(latitude, longitude);
+                    // Mettre à jour la carte dans tous les cas plus bas
                 }
+                // Mise à jour de la carte même si le segment est très court
+                updateMap(latitude, longitude);
             } else {
                 // Premier point, initialiser la carte
                 updateMap(latitude, longitude);

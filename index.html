@@ -1314,6 +1314,13 @@
     ,theme: 'light'
 };
 
+        // Détecter l'exécution sous Capacitor iOS pour désactiver le Service Worker
+        const isIOSCapacitor = typeof window !== 'undefined'
+            && window.Capacitor
+            && typeof Capacitor.getPlatform === 'function'
+            && Capacitor.getPlatform() === 'ios';
+        const canUseServiceWorkers = 'serviceWorker' in navigator && !isIOSCapacitor;
+
         // Variables pour le suivi en arrière-plan
 let isBackgroundRun = false;
 let backgroundRunInterval;
@@ -2919,7 +2926,7 @@ function updateGoalProgress() {
     }
 
     // Enregistrer le Service Worker pour le suivi en arrière-plan
-    if ('serviceWorker' in navigator) {
+    if (canUseServiceWorkers) {
         try {
             const registration = await navigator.serviceWorker.ready;
             
@@ -2983,7 +2990,7 @@ function storeRunDataPeriodically() {
     localStorage.setItem('currentRunData', JSON.stringify(runData));
     
     // Envoyer au Service Worker
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    if (canUseServiceWorkers && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({
             type: 'UPDATE_BACKGROUND_RUN',
             runData: runData
@@ -3048,7 +3055,7 @@ function recoverInterruptedRun() {
 function handleAppResume() {
   if (isBackgroundRun) {
     // Récupérer les données du Service Worker
-    if (navigator.serviceWorker.controller) {
+    if (canUseServiceWorkers && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({
         type: 'GET_BACKGROUND_RUN'
       });
@@ -3066,33 +3073,35 @@ function handleAppResume() {
 }
 
 // Écouter les messages du Service Worker
-navigator.serviceWorker.addEventListener('message', event => {
-  if (event.data.type === 'BACKGROUND_RUN_DATA') {
-    const runData = event.data.runData;
-    // Traiter les données récupérées de l'arrière-plan
-    console.log('Données récupérées:', runData);
-    
-    // Mettre à jour l'interface avec les données
-    if (runData.locations.length > 0) {
-      locationData = runData.locations;
-      distanceTraveled = calculateTotalDistance(runData.locations);
-      runStartTimestamp = runData.startTime;
-      runStartTime = new Date(runData.startTime).toISOString();
-      currentDuration = Math.floor((Date.now() - runStartTimestamp) / 1000);
-      
-      // Mettre à jour l'affichage
-      document.getElementById('distance').textContent = (distanceTraveled / 1000).toFixed(2);
-      document.getElementById('duration').textContent = formatTime(currentDuration);
-      
-      // Recalculer le rythme
-      if (distanceTraveled > 0 && currentDuration > 0) {
-        const paceSeconds = (currentDuration / (distanceTraveled / 1000));
-        const avgPace = secondsToPace(paceSeconds);
-        document.getElementById('current-pace').textContent = avgPace;
+if (canUseServiceWorkers) {
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data.type === 'BACKGROUND_RUN_DATA') {
+      const runData = event.data.runData;
+      // Traiter les données récupérées de l'arrière-plan
+      console.log('Données récupérées:', runData);
+
+      // Mettre à jour l'interface avec les données
+      if (runData.locations.length > 0) {
+        locationData = runData.locations;
+        distanceTraveled = calculateTotalDistance(runData.locations);
+        runStartTimestamp = runData.startTime;
+        runStartTime = new Date(runData.startTime).toISOString();
+        currentDuration = Math.floor((Date.now() - runStartTimestamp) / 1000);
+
+        // Mettre à jour l'affichage
+        document.getElementById('distance').textContent = (distanceTraveled / 1000).toFixed(2);
+        document.getElementById('duration').textContent = formatTime(currentDuration);
+
+        // Recalculer le rythme
+        if (distanceTraveled > 0 && currentDuration > 0) {
+          const paceSeconds = (currentDuration / (distanceTraveled / 1000));
+          const avgPace = secondsToPace(paceSeconds);
+          document.getElementById('current-pace').textContent = avgPace;
+        }
       }
     }
-  }
-});
+  });
+}
 
 // Calculer la distance totale à partir des points GPS
 function calculateTotalDistance(locations) {
@@ -3425,7 +3434,7 @@ function loadTrainingPlan() {
 });
 
         // Service Worker pour la fonctionnalité PWA
-        if ('serviceWorker' in navigator) {
+        if (canUseServiceWorkers) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('service-worker.js')
                     .then(function(registration) {

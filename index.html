@@ -1350,7 +1350,7 @@
         let distanceTraveled = 0;
         let locationData = [];
         let previousLocation = null;
-        let bgWatcherId;
+        let bgWatchId = null;
         let isTrackingLocation = false;
         let mapObject;
         let runMapObject;
@@ -2434,13 +2434,16 @@ function updateGoalProgress() {
         const sections = ['plan', 'run', 'stats', 'profile', 'create-plan'];
         
         sections.forEach(section => {
-            document.getElementById(`nav-${section}`).addEventListener('click', () => {
+            document.getElementById(`nav-${section}`).addEventListener('click', async () => {
+                if (section !== 'run') {
+                    await stopRun();
+                }
                 // Désactiver tous les boutons et sections
                 sections.forEach(s => {
                     document.getElementById(`nav-${s}`).classList.remove('active');
                     document.getElementById(`${s}-section`).classList.remove('active');
                 });
-                
+
                 // Activer le bouton et la section cliqués
                 document.getElementById(`nav-${section}`).classList.add('active');
                 document.getElementById(`${section}-section`).classList.add('active');
@@ -2752,8 +2755,9 @@ function updateGoalProgress() {
         }
         
         // Démarrer le suivi GPS
-        function startGpsTracking() {
-            BG.addWatcher(
+        async function startGpsTracking() {
+            if (bgWatchId) return;
+            const id = await BG.addWatcher(
                 {
                     backgroundMessage: 'RunPacer suit votre course en arrière-plan.',
                     backgroundTitle: 'RunPacer',
@@ -2779,19 +2783,17 @@ function updateGoalProgress() {
                     };
                     handleLocationUpdate(position);
                 }
-            ).then(id => {
-                bgWatcherId = id;
-                isTrackingLocation = true;
-            });
+            );
+            bgWatchId = id;
+            isTrackingLocation = true;
         }
 
         // Arrêter le suivi GPS
-        function stopGpsTracking() {
-            if (bgWatcherId) {
-                BG.removeWatcher({ id: bgWatcherId });
-                bgWatcherId = undefined;
-                isTrackingLocation = false;
-            }
+        async function stopGpsTracking() {
+            if (!bgWatchId) return;
+            await BG.removeWatcher({ id: bgWatchId });
+            bgWatchId = null;
+            isTrackingLocation = false;
         }
         
         // Mettre à jour le feedback de rythme
@@ -2902,7 +2904,7 @@ function updateGoalProgress() {
     runInterval = setInterval(updateRunningTime, 1000);
     
     // Démarrer le GPS
-    startGpsTracking();
+    await startGpsTracking();
     
     // Instruction vocale
     if (userData.voiceEnabled) {
@@ -3046,7 +3048,7 @@ function recoverInterruptedRun() {
 }
 
 // Gérer la reprise après arrière-plan
-function handleAppResume() {
+async function handleAppResume() {
   if (isBackgroundRun) {
     // Récupérer les données du Service Worker
     if (canUseServiceWorkers && navigator.serviceWorker.controller) {
@@ -3061,7 +3063,7 @@ function handleAppResume() {
       runInterval = setInterval(updateRunningTime, 1000);
     }
     if (!isTrackingLocation) {
-      startGpsTracking();
+      await startGpsTracking();
     }
   }
 }
@@ -3123,6 +3125,8 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+window.addEventListener('pagehide', stopRun);
+
 // Sauvegarder automatiquement le plan d'entraînement
 function saveTrainingPlan() {
   localStorage.setItem('runPacerTrainingPlan', JSON.stringify(userData.trainingPlan));
@@ -3170,10 +3174,10 @@ function loadTrainingPlan() {
         }
         
         // Fonction pour mettre en pause la course
-        function pauseRun() {
+        async function pauseRun() {
     isRunning = false;
     clearInterval(runInterval);
-    stopGpsTracking();
+    await stopGpsTracking();
     
     // Mettre à jour l'affichage des boutons
     document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i>';
@@ -3193,10 +3197,10 @@ function loadTrainingPlan() {
 
         
         // Fonction pour reprendre la course
-        function resumeRun() {
+        async function resumeRun() {
             isRunning = true;
             runInterval = setInterval(updateRunningTime, 1000);
-            startGpsTracking();
+            await startGpsTracking();
             
             // Mettre à jour l'affichage des boutons
             document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
@@ -3218,94 +3222,97 @@ function loadTrainingPlan() {
         }
         
         // Fonction pour arrêter la course
-        document.getElementById('stop-btn').addEventListener('click', async function() {
-            if (isRunning || document.getElementById('pause-btn').innerHTML.includes('fa-play')) {
-                clearInterval(runInterval);
-                stopGpsTracking();
-                
-                // Calculer le rythme moyen
-                let avgPace = "--:--";
-                if (distanceTraveled > 0 && currentDuration > 0) {
-                    const paceSeconds = (currentDuration / (distanceTraveled / 1000));
-                    avgPace = secondsToPace(paceSeconds);
-                } else if (currentDuration > 0) {
-                    // Fallback si pas de GPS: utiliser un rythme simulé
-                    avgPace = document.getElementById('target-pace').textContent;
-                }
-                
-                // Instruction vocale
-                if (userData.voiceEnabled) {
-                    const paceSpeech = paceToSpeech(avgPace);
-                    const utterance = new SpeechSynthesisUtterance(`Fin de la course. Rythme moyen: ${paceSpeech} par kilomètre.`);
-                    utterance.lang = 'fr-FR';
-                    speechSynthesis.speak(utterance);
-                    
-                    // Afficher l'indicateur vocal
-                    document.getElementById('voice-indicator').classList.remove('hidden');
-                    setTimeout(() => {
-                        document.getElementById('voice-indicator').classList.add('hidden');
-                    }, 3000);
-                }
-                
-                // Capturer une image du tracé si des données GPS sont disponibles
-                let routeImage = null;
-                if (locationData.length > 1) {
-                    routeImage = await captureRouteImage();
-                }
-                
-                // Sauvegarder la course seulement si une distance a été parcourue
-                if (distanceTraveled > 0 || currentDuration > 60) {
-                    const newRun = {
-                        date: new Date(runStartTime).toISOString().split('T')[0],
-                        startTime: runStartTime,
-                        type: currentRunType,
-                        typeName: runTypes[currentRunType].name,
-                        distance: (distanceTraveled > 0 ? (distanceTraveled / 1000) : (currentDuration / paceToSeconds(avgPace))).toFixed(2),
-                        pace: avgPace,
-                        duration: currentDuration,
-                        gpsData: locationData,
-                        splits: kmSplits,
-                        routeImage: routeImage
-                    };
-                    
-                    userData.runs.unshift(newRun); // Ajouter au début de l'historique
-                    
-                    // Marquer la séance comme terminée dans le plan d'entraînement
-                    const today = new Date().toISOString().split('T')[0];
-                    const sessionIndex = userData.trainingPlan.findIndex(session => session.date === today && session.type === currentRunType);
-                    
-                    if (sessionIndex !== -1) {
-                        userData.trainingPlan[sessionIndex].completed = true;
-                    }
-                    
-                    // Sauvegarder dans le stockage local
-                    localStorage.setItem('runPacerUserData', JSON.stringify(userData));
-                    
-                    // Mise à jour des statistiques
-                    updateHistory();
-                    updateTrainingPlanDisplay();
-                }
-                
-                // Redirection vers la section des statistiques
-                sections.forEach(s => {
-                    document.getElementById(`nav-${s}`).classList.remove('active');
-                    document.getElementById(`${s}-section`).classList.remove('active');
-                });
-                
-                document.getElementById('nav-stats').classList.add('active');
-                document.getElementById('stats-section').classList.add('active');
-                
-                // Réinitialiser l'interface de course
-                isRunning = false;
-                document.getElementById('current-pace').textContent = "--:--";
-                document.getElementById('distance').textContent = "0.00";
-                document.getElementById('duration').textContent = "00:00";
-                document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i>';
-                document.getElementById('pause-btn').onclick = startRun;
-                document.getElementById('stop-btn').disabled = true;
-                document.getElementById('pace-feedback').textContent = "Prêt à commencer";
+        async function stopRun() {
+            if (!(isRunning || document.getElementById('pause-btn').innerHTML.includes('fa-play'))) {
+                return;
             }
-        });
+            clearInterval(runInterval);
+            await stopGpsTracking();
+
+            // Calculer le rythme moyen
+            let avgPace = "--:--";
+            if (distanceTraveled > 0 && currentDuration > 0) {
+                const paceSeconds = (currentDuration / (distanceTraveled / 1000));
+                avgPace = secondsToPace(paceSeconds);
+            } else if (currentDuration > 0) {
+                // Fallback si pas de GPS: utiliser un rythme simulé
+                avgPace = document.getElementById('target-pace').textContent;
+            }
+
+            // Instruction vocale
+            if (userData.voiceEnabled) {
+                const paceSpeech = paceToSpeech(avgPace);
+                const utterance = new SpeechSynthesisUtterance(`Fin de la course. Rythme moyen: ${paceSpeech} par kilomètre.`);
+                utterance.lang = 'fr-FR';
+                speechSynthesis.speak(utterance);
+
+                // Afficher l'indicateur vocal
+                document.getElementById('voice-indicator').classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('voice-indicator').classList.add('hidden');
+                }, 3000);
+            }
+
+            // Capturer une image du tracé si des données GPS sont disponibles
+            let routeImage = null;
+            if (locationData.length > 1) {
+                routeImage = await captureRouteImage();
+            }
+
+            // Sauvegarder la course seulement si une distance a été parcourue
+            if (distanceTraveled > 0 || currentDuration > 60) {
+                const newRun = {
+                    date: new Date(runStartTime).toISOString().split('T')[0],
+                    startTime: runStartTime,
+                    type: currentRunType,
+                    typeName: runTypes[currentRunType].name,
+                    distance: (distanceTraveled > 0 ? (distanceTraveled / 1000) : (currentDuration / paceToSeconds(avgPace))).toFixed(2),
+                    pace: avgPace,
+                    duration: currentDuration,
+                    gpsData: locationData,
+                    splits: kmSplits,
+                    routeImage: routeImage
+                };
+
+                userData.runs.unshift(newRun); // Ajouter au début de l'historique
+
+                // Marquer la séance comme terminée dans le plan d'entraînement
+                const today = new Date().toISOString().split('T')[0];
+                const sessionIndex = userData.trainingPlan.findIndex(session => session.date === today && session.type === currentRunType);
+
+                if (sessionIndex !== -1) {
+                    userData.trainingPlan[sessionIndex].completed = true;
+                }
+
+                // Sauvegarder dans le stockage local
+                localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+
+                // Mise à jour des statistiques
+                updateHistory();
+                updateTrainingPlanDisplay();
+            }
+
+            // Redirection vers la section des statistiques
+            sections.forEach(s => {
+                document.getElementById(`nav-${s}`).classList.remove('active');
+                document.getElementById(`${s}-section`).classList.remove('active');
+            });
+
+            document.getElementById('nav-stats').classList.add('active');
+            document.getElementById('stats-section').classList.add('active');
+
+            // Réinitialiser l'interface de course
+            isRunning = false;
+            document.getElementById('current-pace').textContent = "--:--";
+            document.getElementById('distance').textContent = "0.00";
+            document.getElementById('duration').textContent = "00:00";
+            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+            document.getElementById('pause-btn').onclick = startRun;
+            document.getElementById('stop-btn').disabled = true;
+            document.getElementById('pace-feedback').textContent = "Prêt à commencer";
+        }
+
+        document.getElementById('stop-btn').addEventListener('click', stopRun);
         
         // Charger les données utilisateur depuis le stockage local au démarrage
         window.addEventListener('DOMContentLoaded', function() {

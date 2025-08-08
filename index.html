@@ -12,7 +12,7 @@
     <script src="utils.js"></script>
     
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>RunPacer - Votre Coach de Course</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     <link rel="manifest" href="manifest.json">
@@ -85,6 +85,7 @@
             text-align: center;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             position: relative;
+            padding-top: calc(var(--spacing) + env(safe-area-inset-top));
         }
 
         #theme-toggle {
@@ -108,6 +109,7 @@
             left: 0;
             right: 0;
             z-index: 1000;
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         #nav-profile {
@@ -692,6 +694,8 @@
             align-items: center;
             justify-content: center;
             z-index: 2000;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         #splash-screen.fade-out {

@@ -8,14 +8,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- html2canvas pour capturer la carte -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- Capacitor bridge -->
+    <script src="capacitor.js"></script>
     <!-- Fonctions utilitaires communes -->
     <script src="utils.js"></script>
-
-    <!-- Background geolocation plugin -->
-    <script type="module">
-      import { BackgroundGeolocation } from '@capacitor-community/background-geolocation';
-      window.BackgroundGeolocation = BackgroundGeolocation;
-    </script>
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -1338,9 +1334,14 @@
             && Capacitor.getPlatform() === 'ios';
         const canUseServiceWorkers = 'serviceWorker' in navigator && !isIOSCapacitor;
 
+        const BG = window.Capacitor?.Plugins?.BackgroundGeolocation;
+        if (!BG) {
+            console.warn('BackgroundGeolocation plugin non disponible. Vérifie l\u2019installation native.');
+        }
+
         // Variables pour le suivi en arrière-plan
-let isBackgroundRun = false;
-let backgroundRunInterval;
+        let isBackgroundRun = false;
+        let backgroundRunInterval;
         
         // Variables pour le suivi de course
         let isRunning = false;
@@ -1356,13 +1357,13 @@ let backgroundRunInterval;
         let lastSpokenTime = 0;
         let currentRunType = "easy";
         let kmSplits = [];
-let currentKmStartTime = 0;
-let currentKmStartDistance = 0;
-let currentRouteImage = null;
-let runStartTime = null; // ISO string du début de la course
-let runStartTimestamp = 0; // Timestamp en ms pour la persistance
-// Ajouter ces variables en haut avec les autres :
-let intervalPhase = 'work'; // 'work' ou 'recovery'
+        let currentKmStartTime = 0;
+        let currentKmStartDistance = 0;
+        let currentRouteImage = null;
+        let runStartTime = null; // ISO string du début de la course
+        let runStartTimestamp = 0; // Timestamp en ms pour la persistance
+        // Ajouter ces variables en haut avec les autres :
+        let intervalPhase = 'work'; // 'work' ou 'recovery'
 let intervalDistanceRemaining = 0;
 let currentTargetPace = "5:00"; // Valeur par défaut
 
@@ -2752,7 +2753,7 @@ function updateGoalProgress() {
         
         // Démarrer le suivi GPS
         function startGpsTracking() {
-            BackgroundGeolocation.addWatcher(
+            BG.addWatcher(
                 {
                     backgroundMessage: 'RunPacer suit votre course en arrière-plan.',
                     backgroundTitle: 'RunPacer',
@@ -2787,7 +2788,7 @@ function updateGoalProgress() {
         // Arrêter le suivi GPS
         function stopGpsTracking() {
             if (bgWatcherId) {
-                BackgroundGeolocation.removeWatcher({ id: bgWatcherId });
+                BG.removeWatcher({ id: bgWatcherId });
                 bgWatcherId = undefined;
                 isTrackingLocation = false;
             }

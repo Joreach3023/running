@@ -1349,7 +1349,6 @@ let backgroundRunInterval;
         let distanceTraveled = 0;
         let locationData = [];
         let previousLocation = null;
-        let watchId;
         let bgWatcherId;
         let isTrackingLocation = false;
         let mapObject;
@@ -2572,43 +2571,6 @@ function updateGoalProgress() {
             }
         }
         
-        // Demander les permissions de localisation
-        function requestLocationPermission() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject("La géolocalisation n'est pas supportée par votre navigateur.");
-                    return;
-                }
-                
-                navigator.geolocation.getCurrentPosition(
-                    position => resolve(position),
-                    error => {
-                        console.error('Erreur de géolocalisation:', error);
-                        
-                        switch(error.code) {
-                            case error.PERMISSION_DENIED:
-                                reject('Vous avez refusé l\'accès à votre position.');
-                                break;
-                            case error.POSITION_UNAVAILABLE:
-                                reject('Information de localisation non disponible.');
-                                break;
-                            case error.TIMEOUT:
-                                reject('Délai d\'attente dépassé pour obtenir la position.');
-                                break;
-                            case error.UNKNOWN_ERROR:
-                                reject('Une erreur inconnue s\'est produite.');
-                                break;
-                        }
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
-            });
-        }
-        
         <!-- calculateDistance défini dans utils.js -->
         
         // Mettre à jour la carte avec les nouvelles coordonnées
@@ -2790,65 +2752,43 @@ function updateGoalProgress() {
         
         // Démarrer le suivi GPS
         function startGpsTracking() {
-            if (window.BackgroundGeolocation) {
-                BackgroundGeolocation.addWatcher(
-                    {
-                        backgroundMessage: 'Suivi GPS actif…',
-                        backgroundTitle: 'RunPacer',
-                        requestPermissions: true,
-                        stale: false,
-                        distanceFilter: 5
-                    },
-                    async (location, error) => {
-                        if (error) {
-                            console.error(error);
-                            return;
-                        }
-                        const position = {
-                            coords: {
-                                latitude: location.latitude,
-                                longitude: location.longitude,
-                                accuracy: location.accuracy || 0,
-                                speed: location.speed || 0,
-                                altitude: location.altitude || 0
-                            },
-                            timestamp: location.time || Date.now()
-                        };
-                        handleLocationUpdate(position);
+            BackgroundGeolocation.addWatcher(
+                {
+                    backgroundMessage: 'RunPacer suit votre course en arrière-plan.',
+                    backgroundTitle: 'RunPacer',
+                    requestPermissions: true,
+                    stale: false,
+                    distanceFilter: 5
+                },
+                (location, error) => {
+                    if (error) {
+                        console.error('[BG] Erreur localisation :', error);
+                        return;
                     }
-                ).then(id => {
-                    bgWatcherId = id;
-                    isTrackingLocation = true;
-                });
-            } else if (navigator.geolocation) {
-                watchId = navigator.geolocation.watchPosition(
-                    handleLocationUpdate,
-                    error => {
-                        console.error('Erreur de géolocalisation:', error);
-                        alert(`Erreur GPS: ${error.message}`);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
+                    console.log('[BG] Position reçue :', location.latitude, location.longitude);
+                    const position = {
+                        coords: {
+                            latitude: location.latitude,
+                            longitude: location.longitude,
+                            accuracy: location.accuracy || 0,
+                            speed: location.speed || 0,
+                            altitude: location.altitude || 0
+                        },
+                        timestamp: location.time || Date.now()
+                    };
+                    handleLocationUpdate(position);
+                }
+            ).then(id => {
+                bgWatcherId = id;
                 isTrackingLocation = true;
-            } else {
-                alert('La géolocalisation n\'est pas supportée par votre navigateur.');
-            }
+            });
         }
-        
+
         // Arrêter le suivi GPS
         function stopGpsTracking() {
             if (bgWatcherId) {
                 BackgroundGeolocation.removeWatcher({ id: bgWatcherId });
                 bgWatcherId = undefined;
-                isTrackingLocation = false;
-            }
-            if (watchId !== undefined) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = undefined;
                 isTrackingLocation = false;
             }
         }
@@ -3499,14 +3439,6 @@ function loadTrainingPlan() {
             });
         }
         
-        // Vérifier la disponibilité du GPS
-        if ('geolocation' in navigator) {
-            console.log("Géolocalisation disponible");
-        } else {
-            console.log("Géolocalisation non disponible");
-            alert("Votre appareil ne prend pas en charge la géolocalisation. Certaines fonctionnalités ne seront pas disponibles.");
-        }
-
         function generateGPX(run) {
             if (!run.gpsData || run.gpsData.length < 2) return null;
 

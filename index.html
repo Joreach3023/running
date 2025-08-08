@@ -10,6 +10,12 @@
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <!-- Fonctions utilitaires communes -->
     <script src="utils.js"></script>
+
+    <!-- Background geolocation plugin -->
+    <script type="module">
+      import { BackgroundGeolocation } from '@capacitor-community/background-geolocation';
+      window.BackgroundGeolocation = BackgroundGeolocation;
+    </script>
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -1344,6 +1350,7 @@ let backgroundRunInterval;
         let locationData = [];
         let previousLocation = null;
         let watchId;
+        let bgWatcherId;
         let isTrackingLocation = false;
         let mapObject;
         let runMapObject;
@@ -2783,7 +2790,37 @@ function updateGoalProgress() {
         
         // Démarrer le suivi GPS
         function startGpsTracking() {
-            if (navigator.geolocation) {
+            if (window.BackgroundGeolocation) {
+                BackgroundGeolocation.addWatcher(
+                    {
+                        backgroundMessage: 'Suivi GPS actif…',
+                        backgroundTitle: 'RunPacer',
+                        requestPermissions: true,
+                        stale: false,
+                        distanceFilter: 5
+                    },
+                    async (location, error) => {
+                        if (error) {
+                            console.error(error);
+                            return;
+                        }
+                        const position = {
+                            coords: {
+                                latitude: location.latitude,
+                                longitude: location.longitude,
+                                accuracy: location.accuracy || 0,
+                                speed: location.speed || 0,
+                                altitude: location.altitude || 0
+                            },
+                            timestamp: location.time || Date.now()
+                        };
+                        handleLocationUpdate(position);
+                    }
+                ).then(id => {
+                    bgWatcherId = id;
+                    isTrackingLocation = true;
+                });
+            } else if (navigator.geolocation) {
                 watchId = navigator.geolocation.watchPosition(
                     handleLocationUpdate,
                     error => {
@@ -2804,6 +2841,11 @@ function updateGoalProgress() {
         
         // Arrêter le suivi GPS
         function stopGpsTracking() {
+            if (bgWatcherId) {
+                BackgroundGeolocation.removeWatcher({ id: bgWatcherId });
+                bgWatcherId = undefined;
+                isTrackingLocation = false;
+            }
             if (watchId !== undefined) {
                 navigator.geolocation.clearWatch(watchId);
                 watchId = undefined;

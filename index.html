@@ -3223,7 +3223,7 @@ function loadTrainingPlan() {
         
         // Fonction pour arrêter la course
         async function stopRun() {
-            if (!(isRunning || document.getElementById('pause-btn').innerHTML.includes('fa-play'))) {
+            if (!runStartTime) {
                 return;
             }
             clearInterval(runInterval);
@@ -3310,6 +3310,8 @@ function loadTrainingPlan() {
             document.getElementById('pause-btn').onclick = startRun;
             document.getElementById('stop-btn').disabled = true;
             document.getElementById('pace-feedback').textContent = "Prêt à commencer";
+            runStartTime = null;
+            runStartTimestamp = 0;
         }
 
         document.getElementById('stop-btn').addEventListener('click', stopRun);

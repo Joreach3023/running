@@ -805,6 +805,7 @@
                 <label><input type="radio" name="run-habit" value="occasionnel"> 🏃 Je cours de temps en temps</label>
                 <label><input type="radio" name="run-habit" value="regulier"> 💪 Je suis un coureur régulier avec des objectifs</label>
                 <label><input type="radio" name="run-habit" value="course"> 🎯 Je m'entraîne pour une course précise</label>
+                <label><input type="radio" name="run-habit" value="postpartum"> 🤱 Postpartum (retour progressif)</label>
             </div>
             <button class="btn btn-success" id="onboard-next-2" style="margin-top:16px;">Suivant</button>
         </div>
@@ -1032,7 +1033,25 @@
                             <option value="occasionnel">Occasionnel</option>
                             <option value="regulier">Régulier</option>
                             <option value="course">Course spécifique</option>
+                            <option value="postpartum">Postpartum</option>
                         </select>
+                    </div>
+                    <div id="postpartum-profile-fields" style="display:none;">
+                        <div class="form-group">
+                            <label for="pp-weeks">Semaines post-partum</label>
+                            <input type="number" class="form-control" id="pp-weeks" min="0" max="52">
+                        </div>
+                        <div class="form-group">
+                            <input type="checkbox" id="pp-medical">
+                            <label for="pp-medical">Autorisation médicale obtenue</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="pp-goal">Objectif</label>
+                            <select id="pp-goal" class="form-control">
+                                <option value="run_20min">Courir 20 minutes</option>
+                                <option value="run_30min">Courir 30 minutes</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="current-pace-input">Rythme actuel</label>
@@ -1315,21 +1334,22 @@
         const STRAVA_REDIRECT_URI = window.location.origin + window.location.pathname;
         const MONTHLY_GOAL_KM = 100; // objectif mensuel par défaut
         const userData = {
-    firstName: '',
-    runHabit: 'debutant',
-    currentPace: "4:36", // minutes:secondes par km
-    targetPace: "4:00",
-    eventDate: "2025-06-07",
-    trainingDays: ["tuesday", "thursday", "sunday"],
-    voiceEnabled: true,
-    stravaToken: "",
-    stravaRefreshToken: "",
-    stravaExpiresAt: 0,
-    runs: [], // Historique des courses
-    trainingPlan: [], // Plan d'entraînement généré
-    customPlan: null // Stockera le plan personnalisé généré
-    ,theme: 'light'
-};
+            firstName: '',
+            runHabit: 'debutant',
+            currentPace: "4:36", // minutes:secondes par km
+            targetPace: "4:00",
+            eventDate: "2025-06-07",
+            trainingDays: ["tuesday", "thursday", "sunday"],
+            voiceEnabled: true,
+            stravaToken: "",
+            stravaRefreshToken: "",
+            stravaExpiresAt: 0,
+            runs: [], // Historique des courses
+            trainingPlan: [], // Plan d'entraînement généré
+            customPlan: null, // Stockera le plan personnalisé généré
+            theme: 'light',
+            postpartum: null
+        };
 
         // Détecter l'exécution sous Capacitor iOS pour désactiver le Service Worker
         const isIOSCapacitor = typeof window !== 'undefined'
@@ -1378,6 +1398,19 @@ function applyTheme(theme) {
     const toggle = document.getElementById('theme-toggle');
     if (toggle) {
         toggle.innerHTML = theme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+    }
+}
+
+function updateHabitUI() {
+    const root = document.documentElement;
+    if (userData.runHabit === 'postpartum') {
+        root.style.setProperty('--primary-color', '#e91e63');
+        const ppFields = document.getElementById('postpartum-profile-fields');
+        if (ppFields) ppFields.style.display = 'block';
+    } else {
+        root.style.setProperty('--primary-color', '#3498db');
+        const ppFields = document.getElementById('postpartum-profile-fields');
+        if (ppFields) ppFields.style.display = 'none';
     }
 }
         
@@ -2459,6 +2492,16 @@ function updateGoalProgress() {
             // Mettre à jour les données utilisateur
             userData.firstName = document.getElementById('profile-name-input').value.trim();
             userData.runHabit = document.getElementById('profile-run-habit').value;
+            if (userData.runHabit === 'postpartum') {
+                userData.postpartum = {
+                    weeksPostpartum: parseInt(document.getElementById('pp-weeks').value, 10) || 0,
+                    medicalCleared: document.getElementById('pp-medical').checked,
+                    goal: document.getElementById('pp-goal').value
+                };
+            } else {
+                userData.postpartum = null;
+            }
+            updateHabitUI();
             userData.currentPace = document.getElementById('current-pace-input').value;
             userData.targetPace = document.getElementById('target-pace-input').value;
             userData.eventDate = document.getElementById('event-date-input').value;
@@ -3340,6 +3383,16 @@ function loadTrainingPlan() {
         document.getElementById('strava-connect-btn').onclick = connectStrava;
         document.getElementById('profile-name-input').value = userData.firstName || '';
         document.getElementById('profile-run-habit').value = userData.runHabit || 'debutant';
+        document.getElementById('profile-run-habit').addEventListener('change', function() {
+            userData.runHabit = this.value;
+            updateHabitUI();
+        });
+        if (userData.postpartum) {
+            document.getElementById('pp-weeks').value = userData.postpartum.weeksPostpartum || '';
+            document.getElementById('pp-medical').checked = !!userData.postpartum.medicalCleared;
+            document.getElementById('pp-goal').value = userData.postpartum.goal || 'run_20min';
+        }
+        updateHabitUI();
 
         const params = new URLSearchParams(window.location.search);
         if (params.has('code')) {
@@ -3359,11 +3412,11 @@ function loadTrainingPlan() {
         // Mettre à jour l'affichage
         updateProfileDisplay();
         applyTheme(userData.theme || 'light');
-    }    
-    else {
+    } else {
         applyTheme(userData.theme);
         document.getElementById('profile-name-input').value = userData.firstName;
         document.getElementById('profile-run-habit').value = userData.runHabit;
+        updateHabitUI();
     }
     document.getElementById('theme-toggle').addEventListener('click', function() {
         userData.theme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
@@ -3423,6 +3476,7 @@ function loadTrainingPlan() {
     document.getElementById('onboard-next-2').onclick = () => {
         const habit = document.querySelector('input[name="run-habit"]:checked').value;
         userData.runHabit = habit;
+        updateHabitUI();
         showOnboardingStep(2);
     };
     document.getElementById('onboard-next-3').onclick = () => showOnboardingStep(3);

@@ -2437,10 +2437,7 @@ function updateGoalProgress() {
         const sections = ['plan', 'run', 'stats', 'profile', 'create-plan'];
         
         sections.forEach(section => {
-            document.getElementById(`nav-${section}`).addEventListener('click', async () => {
-                if (section !== 'run') {
-                    await stopRun();
-                }
+            document.getElementById(`nav-${section}`).addEventListener('click', () => {
                 // Désactiver tous les boutons et sections
                 sections.forEach(s => {
                     document.getElementById(`nav-${s}`).classList.remove('active');
@@ -3265,8 +3262,10 @@ function loadTrainingPlan() {
                 routeImage = await captureRouteImage();
             }
 
-            // Sauvegarder la course seulement si une distance a été parcourue
-            if (distanceTraveled > 0 || currentDuration > 60) {
+            const saveRun = confirm('Souhaitez-vous enregistrer cette course ?');
+
+            // Sauvegarder la course seulement si l'utilisateur le souhaite et qu'une distance a été parcourue
+            if (saveRun && (distanceTraveled > 0 || currentDuration > 60)) {
                 const newRun = {
                     date: new Date(runStartTime).toISOString().split('T')[0],
                     startTime: runStartTime,

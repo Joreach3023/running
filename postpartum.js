@@ -112,4 +112,11 @@ function applySymptoms(plan, weekNumber) {
   return plan;
 }
 
-module.exports = { evaluateReadiness, generatePostpartumPlan, applySymptoms };
+const api = { evaluateReadiness, generatePostpartumPlan, applySymptoms };
+
+// Support both Node.js and browser environments
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = api;
+} else if (typeof window !== 'undefined') {
+  window.Postpartum = api;
+}

@@ -12,6 +12,8 @@
     <script src="capacitor.js"></script>
     <!-- Fonctions utilitaires communes -->
     <script src="utils.js"></script>
+    <!-- Plan de reprise postpartum -->
+    <script src="postpartum.js"></script>
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -1828,19 +1830,45 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
         
         // Générer un plan d'entraînement jusqu'à la date de l'événement
         function generateTrainingPlan() {
+            // Mode postpartum : utiliser le générateur dédié
+            if (userData.runHabit === 'postpartum' && userData.postpartum) {
+                const start = new Date();
+                const res = Postpartum.generatePostpartumPlan(userData.postpartum, start);
+                const plan = [];
+                res.weeks.forEach(week => {
+                    week.sessions.forEach(s => {
+                        const date = s.date;
+                        plan.push({
+                            date: date.toISOString().split('T')[0],
+                            day: date.toLocaleDateString('fr-FR', { weekday: 'long' }).toLowerCase(),
+                            type: s.type === 'run' ? 'easy' : s.type,
+                            typeName: s.type === 'run' ? 'Course' : s.type === 'walk' ? 'Marche' : 'Renforcement',
+                            minutes: s.minutes,
+                            rpe: s.rpe || null,
+                            ppType: s.type,
+                            completed: false
+                        });
+                    });
+                });
+                userData.trainingPlan = plan;
+                updateTrainingPlanDisplay();
+                saveTrainingPlan();
+                return;
+            }
+
             const eventDate = new Date(userData.eventDate);
             const today = new Date();
             const daysDiff = Math.floor((eventDate - today) / (1000 * 60 * 60 * 24));
-            
+
             if (daysDiff <= 0) {
                 userData.trainingPlan = [];
                 return;
             }
-            
+
             const currentPaceSeconds = paceToSeconds(userData.currentPace);
             const targetPaceSeconds = paceToSeconds(userData.targetPace);
             const progressPerWeek = (targetPaceSeconds - currentPaceSeconds) / (daysDiff / 7);
-            
+
             const plan = [];
             const trainingDays = userData.trainingDays;
             
@@ -1892,29 +1920,39 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
         function updateTrainingPlanDisplay() {
     const tbody = document.getElementById('full-plan-body');
     tbody.innerHTML = '';
-    
+
     userData.trainingPlan.forEach((session, index) => {
         const tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        tr.addEventListener('click', () => startSelectedSession(index));
+        const canStart = !(userData.runHabit === 'postpartum' && session.ppType !== 'run');
+        tr.style.cursor = canStart ? 'pointer' : 'default';
+        if (canStart) {
+            tr.addEventListener('click', () => startSelectedSession(index));
+        }
         if (session.completed) {
             tr.classList.add('completed-session');
         }
-        
+
         const date = new Date(session.date);
         const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-        
+
+        const thirdCol = userData.runHabit === 'postpartum'
+            ? `${session.minutes} min`
+            : `${session.distance} km`;
+        const fourthCol = userData.runHabit === 'postpartum'
+            ? (session.rpe ? `RPE ${session.rpe}` : '')
+            : `${session.pace} min/km`;
+
         tr.innerHTML = `
             <td>${formattedDate} (${session.day.charAt(0).toUpperCase() + session.day.slice(1)})</td>
             <td>${session.typeName}</td>
-            <td>${session.distance} km</td>
-            <td>${session.pace} min/km</td>
+            <td>${thirdCol}</td>
+            <td>${fourthCol}</td>
             <td>${session.completed ? '<i class="fas fa-check" style="color: #2ecc71;"></i>' : '<i class="fas fa-times" style="color: #e74c3c;"></i>'}</td>
         `;
-        
+
         tbody.appendChild(tr);
     });
-    
+
     updateNextSession();
     renderTrainingCalendar();
     updateGoalProgress();
@@ -1925,6 +1963,10 @@ function startSelectedSession(sessionIndex) {
     const session = userData.trainingPlan[sessionIndex];
 
     if (!session) return;
+
+    if (userData.runHabit === 'postpartum' && session.ppType !== 'run') {
+        return;
+    }
 
     if (session.completed) {
         const runIndex = userData.runs.findIndex(r => r.date === session.date && r.type === session.type);
@@ -1962,10 +2004,15 @@ function startSelectedSession(sessionIndex) {
     
     // Définir le type de course sélectionné
     currentRunType = session.type;
-    document.getElementById(`${session.type}-run`).checked = true;
-    
+    const typeInput = document.getElementById(`${session.type}-run`);
+    if (typeInput) typeInput.checked = true;
+
     // Mettre à jour l'affichage du rythme cible
-    document.getElementById('target-pace').textContent = session.pace;
+    if (userData.runHabit === 'postpartum') {
+        document.getElementById('target-pace').textContent = session.rpe ? `RPE ${session.rpe}` : '';
+    } else {
+        document.getElementById('target-pace').textContent = session.pace;
+    }
     
     // Démarrer la course après un compte à rebours
     startCountdown(() => startRun());
@@ -1974,19 +2021,28 @@ function startSelectedSession(sessionIndex) {
         // Mettre à jour l'affichage de la prochaine séance
         function updateNextSession() {
             const nextSession = userData.trainingPlan.find(session => !session.completed);
-            
+
             if (nextSession) {
                 const date = new Date(nextSession.date);
                 const formattedDate = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-                
+
                 document.getElementById('next-session-title').textContent = `${formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1)} - ${nextSession.typeName}`;
-                document.getElementById('next-session-distance').textContent = `${nextSession.distance} km`;
-                document.getElementById('next-session-pace').textContent = `${nextSession.pace} min/km`;
-                document.getElementById('next-session-goal').textContent = runTypes[nextSession.type].description;
-                
+                if (userData.runHabit === 'postpartum') {
+                    document.getElementById('next-session-distance').textContent = `${nextSession.minutes} min`;
+                    document.getElementById('next-session-pace').textContent = nextSession.rpe ? `RPE ${nextSession.rpe}` : '';
+                    document.getElementById('next-session-goal').textContent = nextSession.typeName;
+                } else {
+                    document.getElementById('next-session-distance').textContent = `${nextSession.distance} km`;
+                    document.getElementById('next-session-pace').textContent = `${nextSession.pace} min/km`;
+                    document.getElementById('next-session-goal').textContent = runTypes[nextSession.type].description;
+                }
+
                 // Mettre à jour le type de course par défaut
-                currentRunType = nextSession.type;
-                document.getElementById(`${nextSession.type}-run`).checked = true;
+                if (!(userData.runHabit === 'postpartum' && nextSession.ppType !== 'run')) {
+                    currentRunType = nextSession.type;
+                    const typeInput = document.getElementById(`${nextSession.type}-run`);
+                    if (typeInput) typeInput.checked = true;
+                }
             } else {
                 document.getElementById('next-session-title').textContent = "Aucune séance programmée";
                 document.getElementById('next-session-distance').textContent = "-- km";

@@ -1764,6 +1764,7 @@ document.getElementById('save-plan-btn').addEventListener('click', function() {
     
     // Sauvegarder dans le stockage local
     localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+    saveTrainingPlan();
     
     // Mettre à jour l'affichage
     updateProfileDisplay();
@@ -3139,6 +3140,9 @@ function loadTrainingPlan() {
   const savedPlan = localStorage.getItem('runPacerTrainingPlan');
   if (savedPlan) {
     userData.trainingPlan = JSON.parse(savedPlan);
+    updateTrainingPlanDisplay();
+  } else if (userData.trainingPlan && userData.trainingPlan.length > 0) {
+    // Fallback if the plan exists only in user data
     updateTrainingPlanDisplay();
   }
 }

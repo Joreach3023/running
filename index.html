@@ -294,6 +294,8 @@
             display: flex;
             justify-content: space-around;
             margin-top: var(--spacing);
+            padding-bottom: calc(var(--spacing) + constant(safe-area-inset-bottom));
+            padding-bottom: calc(var(--spacing) + env(safe-area-inset-bottom));
         }
         
         .big-metric {

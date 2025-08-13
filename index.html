@@ -2990,6 +2990,9 @@ function updateGoalProgress() {
         
         // Fonction pour démarrer la course
         async function startRun(resume = false) {
+    // Gérer les appels d'événements qui passent l'objet Event
+    if (typeof resume !== 'boolean') resume = false;
+
     // Réinitialiser les variables uniquement pour une nouvelle course
     if (!resume) {
         runStartTimestamp = Date.now();
@@ -3458,7 +3461,7 @@ function loadTrainingPlan() {
             document.getElementById('distance').textContent = "0.00";
             document.getElementById('duration').textContent = "00:00";
             document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i>';
-            document.getElementById('pause-btn').onclick = startRun;
+            document.getElementById('pause-btn').onclick = () => startRun();
             document.getElementById('stop-btn').disabled = true;
             document.getElementById('pace-feedback').textContent = "Prêt à commencer";
             runStartTime = null;
@@ -3551,7 +3554,7 @@ function loadTrainingPlan() {
     mapElement.innerHTML = '<div style="background-color: #e0e0e0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"><i class="fas fa-map-marker-alt" style="font-size: 2rem; color: #3498db;"></i><span style="margin-left: 10px;">Carte de suivi GPS</span></div>';
     
     // Définir le bouton pause/démarrer
-    document.getElementById('pause-btn').onclick = startRun;
+    document.getElementById('pause-btn').onclick = () => startRun();
     
     // Démarrer le stockage périodique des données
     setTimeout(storeRunDataPeriodically, 10000);

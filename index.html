@@ -674,14 +674,32 @@
 /* Styles pour la création de plan */
 .days-selection {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-template-columns: repeat(7, 1fr);
     gap: 8px;
     margin-top: 8px;
 }
 
-.days-selection div {
+.days-selection input[type="checkbox"] {
+    display: none;
+}
+
+.days-selection label {
     display: flex;
     align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border: 1px solid var(--muted-color);
+    border-radius: 4px;
+    background-color: var(--surface-alt-color);
+    cursor: pointer;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.days-selection input[type="checkbox"]:checked + label {
+    background-color: var(--primary-color);
+    color: var(--on-primary-color);
+    border-color: var(--primary-color);
 }
 
 #plan-summary {
@@ -1345,25 +1363,25 @@ body.dark-mode .splash-version {
                 <label>Jours d'entraînement préférés</label>
                 <div class="days-selection">
                     <input type="checkbox" id="plan-monday" name="plan-training-days">
-                    <label for="plan-monday">Lundi</label>
-                    
+                    <label for="plan-monday" title="Lundi">Lu</label>
+
                     <input type="checkbox" id="plan-tuesday" name="plan-training-days" checked>
-                    <label for="plan-tuesday">Mardi</label>
-                    
+                    <label for="plan-tuesday" title="Mardi">Ma</label>
+
                     <input type="checkbox" id="plan-wednesday" name="plan-training-days">
-                    <label for="plan-wednesday">Mercredi</label>
-                    
+                    <label for="plan-wednesday" title="Mercredi">Me</label>
+
                     <input type="checkbox" id="plan-thursday" name="plan-training-days" checked>
-                    <label for="plan-thursday">Jeudi</label>
-                    
+                    <label for="plan-thursday" title="Jeudi">Je</label>
+
                     <input type="checkbox" id="plan-friday" name="plan-training-days">
-                    <label for="plan-friday">Vendredi</label>
-                    
+                    <label for="plan-friday" title="Vendredi">Ve</label>
+
                     <input type="checkbox" id="plan-saturday" name="plan-training-days">
-                    <label for="plan-saturday">Samedi</label>
-                    
+                    <label for="plan-saturday" title="Samedi">Sa</label>
+
                     <input type="checkbox" id="plan-sunday" name="plan-training-days" checked>
-                    <label for="plan-sunday">Dimanche</label>
+                    <label for="plan-sunday" title="Dimanche">Di</label>
                 </div>
             </div>
             

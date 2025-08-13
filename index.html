@@ -41,6 +41,10 @@
             --spacing: 16px;
             --font-display: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
             --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            --ion-color-primary: var(--primary-color);
+            --ion-background-color: var(--background-color);
+            --ion-color-success: var(--secondary-color);
+            --pacer-bg: color-mix(in srgb, var(--ion-color-primary) 20%, var(--ion-background-color));
         }
 
         @media (prefers-color-scheme: dark) {
@@ -53,6 +57,8 @@
                 --muted-color: #bdc3c7;
                 --on-primary-color: #ffffff;
                 --shadow-color: rgba(0,0,0,0.5);
+                --ion-background-color: var(--background-color);
+                --pacer-bg: color-mix(in srgb, var(--ion-color-primary) 35%, var(--ion-background-color));
             }
         }
 
@@ -64,6 +70,8 @@
             --text-color: var(--light-color);
             --muted-color: #bdc3c7;
             --shadow-color: rgba(0,0,0,0.5);
+            --ion-background-color: var(--background-color);
+            --pacer-bg: color-mix(in srgb, var(--ion-color-primary) 35%, var(--ion-background-color));
         }
 
         body.dark-mode nav button.active {
@@ -299,15 +307,60 @@
             margin-bottom: var(--spacing);
         }
 
-        .digital-display {
+        #current-pace-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .current-pace-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            aspect-ratio: 5 / 2;
+            max-width: 360px;
+            width: 100%;
+            margin-inline: auto;
+        }
+
+        .pace-display {
+            width: 100%;
+            height: 100%;
+        }
+
+        .pace-display rect {
+            fill: var(--pacer-bg);
+        }
+
+        .pace-display text {
             font-family: 'Orbitron', monospace;
-            background-color: #000;
-            color: #00ff00;
-            padding: 8px 12px;
-            border-radius: 6px;
-            display: inline-block;
-            letter-spacing: 2px;
-            text-shadow: 0 0 5px #00ff00;
+            font-size: 120px;
+            fill: var(--ion-color-primary);
+            text-anchor: middle;
+            dominant-baseline: middle;
+            filter: drop-shadow(0 0 2px var(--ion-color-primary));
+        }
+
+        .pace-display #pace-colon {
+            fill: var(--ion-color-success);
+            filter: drop-shadow(0 0 2px var(--ion-color-success));
+        }
+
+        #pace-feedback {
+            text-align: center;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .pace-display text {
+                filter: drop-shadow(0 0 4px var(--ion-color-primary));
+            }
+
+            .pace-display #pace-colon {
+                filter: drop-shadow(0 0 4px var(--ion-color-success));
+            }
         }
         
         .metrics-row {
@@ -1033,8 +1086,17 @@ body.dark-mode .splash-version {
             
             <div class="card" id="current-pace-card">
                 <div class="big-metric-label">Rythme actuel</div>
-                <div class="big-metric digital-display" id="current-pace">--:--</div>
-                <div id="pace-feedback" class="good-pace">Prêt à commencer</div>
+                <div class="current-pace-container">
+                    <svg id="current-pace-display" class="pace-display" viewBox="0 0 500 200">
+                        <rect width="500" height="200" rx="16"></rect>
+                        <text x="250" y="100" id="pace-text">
+                            <tspan id="pace-minutes">--</tspan>
+                            <tspan id="pace-colon">:</tspan>
+                            <tspan id="pace-seconds">--</tspan>
+                        </text>
+                    </svg>
+                    <div id="pace-feedback" class="good-pace">Prêt à commencer</div>
+                </div>
             </div>
 
             <div id="interval-indicator" class="hidden" style="text-align: center; margin: 10px 0; font-weight: bold;">
@@ -2972,9 +3034,9 @@ function updateGoalProgress() {
                     if (currentPaceSeconds > 0) {
                         const paceMinutes = Math.floor(currentPaceSeconds);
                         const paceSeconds = Math.floor((currentPaceSeconds - paceMinutes) * 60);
-                        document.getElementById('current-pace').textContent = 
-                            `${paceMinutes}:${paceSeconds.toString().padStart(2, '0')}`;
-                        
+                        document.getElementById('pace-minutes').textContent = paceMinutes.toString().padStart(2, '0');
+                        document.getElementById('pace-seconds').textContent = paceSeconds.toString().padStart(2, '0');
+
                         // Feedback sur le rythme
                         updatePaceFeedback(currentPaceSeconds * 60); // Convertir en secondes
                     }
@@ -3137,7 +3199,8 @@ function updateGoalProgress() {
 
     // Réinitialiser l'affichage pour une nouvelle course
     if (!resume) {
-        document.getElementById('current-pace').textContent = "--:--";
+        document.getElementById('pace-minutes').textContent = "--";
+        document.getElementById('pace-seconds').textContent = "--";
         document.getElementById('distance').textContent = "0.00";
         document.getElementById('duration').textContent = "00:00";
         document.getElementById('pace-feedback').textContent = "Course en cours...";
@@ -3343,7 +3406,9 @@ if (canUseServiceWorkers) {
         if (distanceTraveled > 0 && currentDuration > 0) {
           const paceSeconds = (currentDuration / (distanceTraveled / 1000));
           const avgPace = secondsToPace(paceSeconds);
-          document.getElementById('current-pace').textContent = avgPace;
+          const [avgMin, avgSec] = avgPace.split(':');
+          document.getElementById('pace-minutes').textContent = avgMin;
+          document.getElementById('pace-seconds').textContent = avgSec;
         }
       }
     }
@@ -3562,7 +3627,8 @@ function loadTrainingPlan() {
 
             // Réinitialiser l'interface de course
             isRunning = false;
-            document.getElementById('current-pace').textContent = "--:--";
+            document.getElementById('pace-minutes').textContent = "--";
+            document.getElementById('pace-seconds').textContent = "--";
             document.getElementById('distance').textContent = "0.00";
             document.getElementById('duration').textContent = "00:00";
             document.getElementById('pause-btn').innerHTML = '<i data-lucide="play"></i>';

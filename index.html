@@ -19,6 +19,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>RunPacer - Votre Coach de Course</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -37,6 +38,8 @@
             --on-primary-color: #ffffff;
             --shadow-color: rgba(0,0,0,0.05);
             --spacing: 16px;
+            --font-display: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -80,15 +83,22 @@
         body.dark-mode table {
             color: var(--light-color);
         }
-        
+
+        html {
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
+
         body {
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.5;
             background-color: var(--background-color);
             color: var(--text-color);
             min-height: 100vh;
@@ -97,7 +107,12 @@
             touch-action: manipulation;
             padding-bottom: 60px; /* espace pour la barre de navigation fixe */
         }
-        
+
+        h1, h2, h3 {
+            font-family: var(--font-display);
+            letter-spacing: .2px;
+        }
+
         header {
             background-color: var(--primary-color);
             color: white;

@@ -29,23 +29,34 @@
             --dark-color: #2c3e50;
             --light-color: #ecf0f1;
             --muted-color: #7f8c8d;
+            --background-color: #f5f7fa;
+            --surface-color: #ffffff;
+            --surface-alt-color: #f8f9fa;
+            --surface-alt2-color: #e9ecef;
+            --text-color: var(--dark-color);
+            --on-primary-color: #ffffff;
             --spacing: 16px;
         }
 
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-color: #121212;
+                --surface-color: #1e1e1e;
+                --surface-alt-color: #2a2a2a;
+                --surface-alt2-color: #3a3a3a;
+                --text-color: var(--light-color);
+                --muted-color: #bdc3c7;
+                --on-primary-color: #ffffff;
+            }
+        }
+
         body.dark-mode {
-            background-color: #121212;
-            color: var(--light-color);
+            --background-color: #121212;
+            --surface-color: #1e1e1e;
+            --surface-alt-color: #2a2a2a;
+            --surface-alt2-color: #3a3a3a;
+            --text-color: var(--light-color);
             --muted-color: #bdc3c7;
-        }
-
-        body.dark-mode nav,
-        body.dark-mode .card {
-            background-color: #1e1e1e;
-            color: var(--light-color);
-        }
-
-        body.dark-mode nav button {
-            color: var(--light-color);
         }
 
         body.dark-mode nav button.active {
@@ -75,8 +86,8 @@
         }
         
         body {
-            background-color: #f5f7fa;
-            color: var(--dark-color);
+            background-color: var(--background-color);
+            color: var(--text-color);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -112,7 +123,7 @@
         nav {
             display: flex;
             justify-content: space-around;
-            background-color: white;
+            background-color: var(--surface-color);
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             position: fixed;
             bottom: 0;
@@ -132,7 +143,7 @@
             padding: var(--spacing);
             flex: 1;
             cursor: pointer;
-            color: var(--dark-color);
+            color: var(--text-color);
             border-bottom: 3px solid transparent;
         }
         
@@ -165,7 +176,7 @@
         }
         
         .card {
-            background-color: white;
+            background-color: var(--surface-color);
             border-radius: 8px;
             padding: var(--spacing);
             margin-bottom: var(--spacing);
@@ -450,16 +461,33 @@
         .run-type label {
             display: block;
             padding: 10px;
-            background-color: #f8f9fa;
+            background-color: var(--surface-alt-color);
             border-radius: 4px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background-color 0.2s, color 0.2s;
+            color: var(--text-color);
         }
-        
+
         .run-type input[type="radio"]:checked + label {
             background-color: var(--primary-color);
-            color: white;
+            color: var(--on-primary-color);
+        }
+
+        .run-type input[type="radio"]:not(:disabled) + label:hover {
+            background-color: var(--surface-alt2-color);
+        }
+
+        .run-type input[type="radio"]:focus-visible + label {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        .run-type input[type="radio"]:disabled + label {
+            background-color: var(--surface-alt-color);
+            color: var(--muted-color);
+            cursor: not-allowed;
+            opacity: 0.6;
         }
         
         /* Amélioration de l'affichage des cartes */
@@ -573,10 +601,20 @@
     margin-top: 8px;
 }
 .calendar-day {
-    background-color: #f8f9fa;
+    background-color: var(--surface-alt-color);
     border-radius: 4px;
     padding: 2px 0;
     font-size: 0.75rem;
+    color: var(--text-color);
+}
+
+.calendar-day:hover {
+    background-color: var(--surface-alt2-color);
+}
+
+.calendar-day:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
 .session-icon {
     display: block;
@@ -595,7 +633,8 @@ body.dark-mode .splash-version {
 }
 .calendar-day.completed {
     position: relative;
-    background-color: #e9ecef;
+    background-color: var(--surface-alt2-color);
+    color: var(--text-color);
 }
 .calendar-day.completed .done-star {
     position: absolute;

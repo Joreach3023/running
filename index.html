@@ -274,6 +274,58 @@
         .btn-strava:hover {
             filter: brightness(1.1);
         }
+
+        .onboarding-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 16px 0;
+        }
+        .onboarding-toggle.disabled {
+            opacity: 0.5;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 42px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .switch .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .switch .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        .switch input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+        .switch input:checked + .slider.strava {
+            background-color: var(--strava-color);
+        }
+        .switch input:checked + .slider:before {
+            transform: translateX(18px);
+        }
         
         .run-controls {
             display: flex;
@@ -918,6 +970,24 @@ body.dark-mode .splash-version {
             </div>
             <button class="btn btn-primary" id="onboard-next-2" style="margin-top:16px;">Suivant</button>
         </div>
+        <div class="onboarding-step" id="onboard-step-connections">
+            <h2>Connecte tes applications</h2>
+            <div class="onboarding-toggle">
+                <span>Se connecter à Strava</span>
+                <label class="switch">
+                    <input type="checkbox" id="onboard-strava-toggle">
+                    <span class="slider strava"></span>
+                </label>
+            </div>
+            <div class="onboarding-toggle disabled" title="Bientôt disponible">
+                <span>Se connecter à Garmin</span>
+                <label class="switch">
+                    <input type="checkbox" disabled>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button class="btn btn-primary" id="onboard-connections-continue" style="margin-top:16px;">Continuer</button>
+        </div>
         <div class="onboarding-step" id="onboard-step-3">
             <h2>Pourquoi RunPacer existe ? 📍</h2>
             <p>💚 RunPacer a été créé pour simplifier la course à pied et t'accompagner dans un parcours motivant, accessible et adapté à toi.</p>
@@ -1219,19 +1289,28 @@ body.dark-mode .splash-version {
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="strava-token-input">Token d'accès Strava</label>
-                        <input type="text" class="form-control" id="strava-token-input" placeholder="OAuth token">
-                        <div class="form-hint">Générez un token depuis votre compte Strava</div>
-                    </div>
-
-                    <div class="form-group">
-                        <button type="button" class="btn btn-strava" id="strava-connect-btn" title="Connecter Strava"><i class="fas fa-link"></i></button>
-                        <div id="strava-status" class="form-hint"></div>
-                    </div>
-                    
                     <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
                 </form>
+            </div>
+            <div class="card">
+                <div class="card-title">Connexions</div>
+                <div class="onboarding-toggle">
+                    <span>Strava</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <label class="switch">
+                            <input type="checkbox" id="profile-strava-toggle">
+                            <span class="slider strava"></span>
+                        </label>
+                        <button class="btn btn-ghost" id="profile-strava-disconnect" style="display:none;">Déconnecter</button>
+                    </div>
+                </div>
+                <div class="onboarding-toggle disabled" title="Bientôt disponible">
+                    <span>Garmin</span>
+                    <label class="switch">
+                        <input type="checkbox" disabled>
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
 
@@ -1520,6 +1599,23 @@ function updateHabitUI() {
         root.style.setProperty('--primary-color', '#3498db');
         const ppFields = document.getElementById('postpartum-profile-fields');
         if (ppFields) ppFields.style.display = 'none';
+    }
+}
+
+function updateConnectionsUI() {
+    const connected = !!userData.stravaToken;
+    const profileToggle = document.getElementById('profile-strava-toggle');
+    const profileDisconnect = document.getElementById('profile-strava-disconnect');
+    const onboardToggle = document.getElementById('onboard-strava-toggle');
+    if (profileToggle) {
+        profileToggle.checked = connected;
+        profileToggle.disabled = connected;
+    }
+    if (profileDisconnect) {
+        profileDisconnect.style.display = connected ? 'inline-block' : 'none';
+    }
+    if (onboardToggle) {
+        onboardToggle.checked = connected;
     }
 }
         
@@ -2668,9 +2764,7 @@ function updateGoalProgress() {
             userData.currentPace = document.getElementById('current-pace-input').value;
             userData.targetPace = document.getElementById('target-pace-input').value;
             userData.eventDate = document.getElementById('event-date-input').value;
-            userData.stravaToken = document.getElementById('strava-token-input').value;
-            document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
-            
+
             // Mettre à jour les jours d'entraînement
             userData.trainingDays = [];
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -3544,9 +3638,6 @@ function loadTrainingPlan() {
         document.getElementById('current-pace-input').value = userData.currentPace;
         document.getElementById('target-pace-input').value = userData.targetPace;
         document.getElementById('event-date-input').value = userData.eventDate;
-        document.getElementById('strava-token-input').value = userData.stravaToken || '';
-        document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
-        document.getElementById('strava-connect-btn').onclick = connectStrava;
         document.getElementById('profile-name-input').value = userData.firstName || '';
         document.getElementById('profile-run-habit').value = userData.runHabit || 'debutant';
         document.getElementById('profile-run-habit').addEventListener('change', function() {
@@ -3559,6 +3650,10 @@ function loadTrainingPlan() {
             document.getElementById('pp-goal').value = userData.postpartum.goal || 'run_20min';
         }
         updateHabitUI();
+        updateConnectionsUI();
+        if (userData.stravaToken) {
+            localStorage.setItem('connectionsOnboarded', '1');
+        }
 
         const params = new URLSearchParams(window.location.search);
         if (params.has('code')) {
@@ -3583,13 +3678,40 @@ function loadTrainingPlan() {
         document.getElementById('profile-name-input').value = userData.firstName;
         document.getElementById('profile-run-habit').value = userData.runHabit;
         updateHabitUI();
+        updateConnectionsUI();
+        if (userData.stravaToken) {
+            localStorage.setItem('connectionsOnboarded', '1');
+        }
     }
     document.getElementById('theme-toggle').addEventListener('click', function() {
         userData.theme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
-        applyTheme(userData.theme);
-        localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+       applyTheme(userData.theme);
+       localStorage.setItem('runPacerUserData', JSON.stringify(userData));
     });
-    
+
+    const onboardStravaToggle = document.getElementById('onboard-strava-toggle');
+    if (onboardStravaToggle) {
+        onboardStravaToggle.addEventListener('change', () => {
+            if (onboardStravaToggle.checked) connectStrava();
+        });
+    }
+    const profileStravaToggle = document.getElementById('profile-strava-toggle');
+    if (profileStravaToggle) {
+        profileStravaToggle.addEventListener('change', () => {
+            if (profileStravaToggle.checked) connectStrava();
+        });
+    }
+    const profileStravaDisconnect = document.getElementById('profile-strava-disconnect');
+    if (profileStravaDisconnect) {
+        profileStravaDisconnect.addEventListener('click', () => {
+            userData.stravaToken = '';
+            userData.stravaRefreshToken = '';
+            userData.stravaExpiresAt = 0;
+            localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+            updateConnectionsUI();
+        });
+    }
+
     // Charger le plan d'entraînement
     loadTrainingPlan();
     
@@ -3643,9 +3765,20 @@ function loadTrainingPlan() {
         const habit = document.querySelector('input[name="run-habit"]:checked').value;
         userData.runHabit = habit;
         updateHabitUI();
-        showOnboardingStep(2);
+        if (!localStorage.getItem('connectionsOnboarded')) {
+            showOnboardingStep(2);
+        } else {
+            showOnboardingStep(3);
+        }
     };
-    document.getElementById('onboard-next-3').onclick = () => showOnboardingStep(3);
+    const onboardConnectionsContinue = document.getElementById('onboard-connections-continue');
+    if (onboardConnectionsContinue) {
+        onboardConnectionsContinue.onclick = () => {
+            localStorage.setItem('connectionsOnboarded', '1');
+            showOnboardingStep(3);
+        };
+    }
+    document.getElementById('onboard-next-3').onclick = () => showOnboardingStep(4);
     document.getElementById('onboard-create').onclick = () => {
         onboardingOverlay.classList.remove('active');
         localStorage.setItem('onboardingCompleted', '1');
@@ -3766,7 +3899,7 @@ function loadTrainingPlan() {
             userData.stravaRefreshToken = data.refresh_token;
             userData.stravaExpiresAt = data.expires_at;
             localStorage.setItem('runPacerUserData', JSON.stringify(userData));
-            document.getElementById('strava-status').textContent = 'Connecté';
+            updateConnectionsUI();
         }
 
         async function ensureStravaToken() {

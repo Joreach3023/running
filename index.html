@@ -116,7 +116,7 @@
             display: flex;
             flex-direction: column;
             touch-action: manipulation;
-            padding-bottom: calc(56px + env(safe-area-inset-bottom)); /* espace pour la barre de navigation fixe */
+            padding-bottom: 60px; /* espace pour la barre de navigation fixe */
         }
 
         h1, h2, h3 {
@@ -152,7 +152,6 @@
         nav {
             display: flex;
             justify-content: space-around;
-            align-items: center;
             background-color: var(--surface-color);
             box-shadow: 0 2px 5px var(--shadow-color);
             position: fixed;
@@ -160,17 +159,7 @@
             left: 0;
             right: 0;
             z-index: 1000;
-            height: 56px;
             padding-bottom: env(safe-area-inset-bottom);
-        }
-
-        ion-tab-bar {
-            --height: 56px;
-            z-index: 1000;
-        }
-
-        ion-content {
-            --padding-bottom: calc(56px + env(safe-area-inset-bottom));
         }
 
         #nav-profile {
@@ -499,10 +488,6 @@
             margin-bottom: var(--spacing);
             border-radius: 8px;
             overflow: hidden;
-        }
-
-        .leaflet-bottom {
-            bottom: calc(56px + env(safe-area-inset-bottom) + 8px);
         }
         
         #run-map {

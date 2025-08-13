@@ -28,12 +28,14 @@
             --strava-color: #fc4c02;
             --dark-color: #2c3e50;
             --light-color: #ecf0f1;
+            --muted-color: #7f8c8d;
             --spacing: 16px;
         }
 
         body.dark-mode {
             background-color: #121212;
             color: var(--light-color);
+            --muted-color: #bdc3c7;
         }
 
         body.dark-mode nav,
@@ -226,7 +228,7 @@
         
         .big-metric-label {
             text-align: center;
-            color: #95a5a6;
+            color: var(--muted-color);
             margin-bottom: var(--spacing);
         }
         
@@ -252,7 +254,7 @@
         
         .metric-box-label {
             font-size: 0.8rem;
-            color: #95a5a6;
+            color: var(--muted-color);
         }
         
         .stats-grid {
@@ -381,7 +383,7 @@
         
         .form-hint {
             font-size: 0.8rem;
-            color: #7f8c8d;
+            color: var(--muted-color);
             margin-top: 4px;
         }
         
@@ -582,7 +584,11 @@
 }
 .session-easy { color: var(--secondary-color); }
 .session-interval { color: var(--warning-color); }
-.session-rest { color: #7f8c8d; }
+.session-rest { color: var(--muted-color); }
+body.dark-mode .splash-logo,
+body.dark-mode .splash-version {
+    color: var(--light-color);
+}
 .completed-session td {
     text-decoration: line-through;
     opacity: 0.6;

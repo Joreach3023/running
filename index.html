@@ -19,6 +19,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>RunPacer - Votre Coach de Course</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <style>
@@ -200,6 +201,10 @@
             margin-bottom: var(--spacing);
             box-shadow: 0 2px 5px var(--shadow-color);
             overflow-x: auto; /* Avoid page overflow on small screens */
+        }
+
+        .card.glow {
+            box-shadow: 0 0 10px var(--secondary-color);
         }
         
         .card-title {
@@ -924,7 +929,7 @@ body.dark-mode .splash-version {
                     <p>Distance: <strong id="next-session-distance">5 km</strong></p>
                     <p>Rythme cible: <strong id="next-session-pace">5:00 min/km</strong></p>
                     <p id="next-session-goal">Objectif: Récupération active, travail cardiovasculaire léger</p>
-                    <button class="btn btn-success" id="start-run-btn" title="Démarrer la course"><i class="fas fa-play"></i></button>
+                    <button class="btn btn-success" id="start-run-btn" title="Démarrer la course"><i data-lucide="play"></i></button>
                 </div>
             </div>
             <div class="card">
@@ -969,20 +974,20 @@ body.dark-mode .splash-version {
                     </div>
                     <div class="run-type">
                         <input type="radio" id="interval-run" name="run-type" value="interval">
-                        <label for="interval-run"><i class="fas fa-tachometer-alt"></i> Intervalles</label>
+                        <label for="interval-run"><i data-lucide="gauge"></i> Intervalles</label>
                     </div>
                     <div class="run-type">
                         <input type="radio" id="long-run" name="run-type" value="long">
-                        <label for="long-run"><i class="fas fa-road"></i> Longue sortie</label>
+                        <label for="long-run"><i data-lucide="road"></i> Longue sortie</label>
                     </div>
                     <div class="run-type">
                         <input type="radio" id="tempo-run" name="run-type" value="tempo">
-                        <label for="tempo-run"><i class="fas fa-fire"></i> Course tempo</label>
+                        <label for="tempo-run"><i data-lucide="flame"></i> Course tempo</label>
                     </div>
                 </div>
             </div>
-            
-            <div class="card">
+
+            <div class="card" id="current-pace-card">
                 <div class="big-metric-label">Rythme actuel</div>
                 <div class="big-metric" id="current-pace">--:--</div>
                 <div id="pace-feedback" class="good-pace">Prêt à commencer</div>
@@ -1013,8 +1018,8 @@ body.dark-mode .splash-version {
             </div>
             
             <div class="run-controls">
-                <button class="btn btn-lg btn-success" id="pause-btn" title="Démarrer la course"><i class="fas fa-play"></i></button>
-                <button class="btn btn-lg btn-warning" id="stop-btn" disabled><i class="fas fa-stop"></i></button>
+                <button class="btn btn-lg btn-success" id="pause-btn" title="Démarrer la course"><i data-lucide="play"></i></button>
+                <button class="btn btn-lg btn-warning" id="stop-btn" disabled><i data-lucide="square"></i></button>
             </div>
             
             <div class="voice-indicator hidden" id="voice-indicator">
@@ -1333,10 +1338,10 @@ body.dark-mode .splash-version {
             </div>
             
             <div class="run-controls">
-                <button class="btn" id="share-run-btn"><i class="fas fa-share-alt"></i> Partager</button>
-                <button class="btn" id="export-gpx-btn"><i class="fas fa-file-export"></i> Exporter GPX</button>
+                <button class="btn" id="share-run-btn"><i data-lucide="share"></i> Partager</button>
+                <button class="btn" id="export-gpx-btn"><i data-lucide="download"></i> Exporter GPX</button>
                 <button class="btn" id="strava-upload-btn"><i class="fab fa-strava"></i> Strava</button>
-                <button class="btn" id="back-to-stats-btn"><i class="fas fa-arrow-left"></i> Retour</button>
+                <button class="btn" id="back-to-stats-btn"><i data-lucide="arrow-left"></i> Retour</button>
             </div>
         </div>
     </div>
@@ -1543,6 +1548,18 @@ const runTypes = {
             if (navigator.vibrate) {
                 navigator.vibrate([200, 100, 200]);
             }
+        }
+
+        function playBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = 880;
+                osc.connect(ctx.destination);
+                osc.start();
+                setTimeout(() => { osc.stop(); ctx.close(); }, 100);
+            } catch (e) {}
         }
 
         // Annoncer la phase d'intervalle avec rythme et distance
@@ -2678,6 +2695,8 @@ function updateGoalProgress() {
         
         // Lien entre le bouton "Commencer la séance" et la section "Courir"
         document.getElementById('start-run-btn').addEventListener('click', () => {
+            if (navigator.vibrate) navigator.vibrate(100);
+            playBeep();
             // Désactiver tous les boutons et sections
             sections.forEach(s => {
                 document.getElementById(`nav-${s}`).classList.remove('active');
@@ -2964,10 +2983,12 @@ function updateGoalProgress() {
         function updatePaceFeedback(currentPaceSeconds) {
     const targetPaceSeconds = paceToSeconds(currentTargetPace);
     const paceFeedback = document.getElementById('pace-feedback');
-            
+    const paceCard = document.getElementById('current-pace-card');
+
             if (currentPaceSeconds < targetPaceSeconds - 15) {
                 paceFeedback.textContent = "Ralentissez un peu!";
                 paceFeedback.className = "too-fast";
+                paceCard.classList.remove('glow');
                 
                 // Instruction vocale si nécessaire
                 if (userData.voiceEnabled && currentDuration - lastSpokenTime > 60) {
@@ -2986,6 +3007,7 @@ function updateGoalProgress() {
                 const message = slowPhrases[Math.floor(Math.random()*slowPhrases.length)];
                 paceFeedback.textContent = message;
                 paceFeedback.className = "too-slow";
+                paceCard.classList.remove('glow');
                 
                 // Instruction vocale si nécessaire
                 if (userData.voiceEnabled && currentDuration - lastSpokenTime > 60) {
@@ -3003,6 +3025,7 @@ function updateGoalProgress() {
             } else {
                 paceFeedback.textContent = "Bon rythme, continuez!";
                 paceFeedback.className = "good-pace";
+                paceCard.classList.add('glow');
             }
         }
         
@@ -3063,8 +3086,9 @@ function updateGoalProgress() {
     }
     
     // Activer/désactiver les boutons
-    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
+    document.getElementById('pause-btn').innerHTML = '<i data-lucide="pause"></i>';
     document.getElementById('pause-btn').onclick = pauseRun;
+    if (window.lucide) lucide.createIcons();
     document.getElementById('stop-btn').disabled = false;
     
     // Démarrer le chrono
@@ -3350,8 +3374,9 @@ function loadTrainingPlan() {
     await stopGpsTracking();
     
     // Mettre à jour l'affichage des boutons
-    document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+    document.getElementById('pause-btn').innerHTML = '<i data-lucide="play"></i>';
     document.getElementById('pause-btn').onclick = resumeRun;
+    if (window.lucide) lucide.createIcons();
     document.getElementById('pace-feedback').textContent = "Course en pause";
     
     // Sauvegarder l'état actuel
@@ -3373,8 +3398,9 @@ function loadTrainingPlan() {
             await startGpsTracking();
             
             // Mettre à jour l'affichage des boutons
-            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
+            document.getElementById('pause-btn').innerHTML = '<i data-lucide="pause"></i>';
             document.getElementById('pause-btn').onclick = pauseRun;
+            if (window.lucide) lucide.createIcons();
             document.getElementById('pace-feedback').textContent = "Course en cours...";
             
             // Instruction vocale
@@ -3478,8 +3504,9 @@ function loadTrainingPlan() {
             document.getElementById('current-pace').textContent = "--:--";
             document.getElementById('distance').textContent = "0.00";
             document.getElementById('duration').textContent = "00:00";
-            document.getElementById('pause-btn').innerHTML = '<i class="fas fa-play"></i>';
+            document.getElementById('pause-btn').innerHTML = '<i data-lucide="play"></i>';
             document.getElementById('pause-btn').onclick = () => startRun();
+            if (window.lucide) lucide.createIcons();
             document.getElementById('stop-btn').disabled = true;
             document.getElementById('pace-feedback').textContent = "Prêt à commencer";
             runStartTime = null;
@@ -3802,6 +3829,7 @@ function loadTrainingPlan() {
 
         // Disparition de l'écran d'accueil après chargement
         window.addEventListener('load', function() {
+            if (window.lucide) lucide.createIcons();
             const splash = document.getElementById('splash-screen');
             if (splash) {
                 setTimeout(() => {

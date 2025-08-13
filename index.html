@@ -10,6 +10,8 @@
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <!-- Capacitor bridge -->
     <script src="capacitor.js"></script>
+    <!-- Connection and onboarding state -->
+    <script src="connections.js"></script>
     <!-- Fonctions utilitaires communes -->
     <script src="utils.js"></script>
     <!-- Plan de reprise postpartum -->
@@ -2783,6 +2785,11 @@ function updateGoalProgress() {
             userData.eventDate = document.getElementById('event-date-input').value;
             userData.stravaToken = document.getElementById('strava-token-input').value;
             document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
+            if (userData.stravaToken) {
+                connections.connectStrava();
+            } else {
+                connections.disconnectStrava();
+            }
             
             // Mettre à jour les jours d'entraînement
             userData.trainingDays = [];
@@ -3784,16 +3791,16 @@ function loadTrainingPlan() {
     document.getElementById('onboard-next-3').onclick = () => showOnboardingStep(3);
     document.getElementById('onboard-create').onclick = () => {
         onboardingOverlay.classList.remove('active');
-        localStorage.setItem('onboardingCompleted', '1');
+        connections.setOnboardingShown();
         localStorage.setItem('runPacerUserData', JSON.stringify(userData));
         document.getElementById('nav-create-plan').click();
     };
     document.getElementById('onboard-skip').onclick = () => {
         onboardingOverlay.classList.remove('active');
-        localStorage.setItem('onboardingCompleted', '1');
+        connections.setOnboardingShown();
         localStorage.setItem('runPacerUserData', JSON.stringify(userData));
     };
-    if (!localStorage.getItem('onboardingCompleted')) {
+    if (connections.shouldShowOnboarding()) {
         onboardingOverlay.classList.add('active');
         showOnboardingStep(0);
     }
@@ -3903,6 +3910,7 @@ function loadTrainingPlan() {
             userData.stravaExpiresAt = data.expires_at;
             localStorage.setItem('runPacerUserData', JSON.stringify(userData));
             document.getElementById('strava-status').textContent = 'Connecté';
+            connections.connectStrava();
         }
 
         async function ensureStravaToken() {

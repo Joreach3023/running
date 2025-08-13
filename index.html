@@ -2009,7 +2009,8 @@ document.getElementById('save-plan-btn').addEventListener('click', function() {
         document.getElementById(`nav-${s}`).classList.remove('active');
         document.getElementById(`${s}-section`).classList.remove('active');
     });
-    
+    document.getElementById('run-detail-section').classList.remove('active');
+
     document.getElementById('nav-plan').classList.add('active');
     document.getElementById('plan-section').classList.add('active');
     
@@ -2195,7 +2196,8 @@ function startSelectedSession(sessionIndex) {
         document.getElementById(`nav-${s}`).classList.remove('active');
         document.getElementById(`${s}-section`).classList.remove('active');
     });
-    
+    document.getElementById('run-detail-section').classList.remove('active');
+
     // Activer la section "Courir"
     document.getElementById('nav-run').classList.add('active');
     document.getElementById('run-section').classList.add('active');
@@ -2733,6 +2735,7 @@ function updateGoalProgress() {
                     document.getElementById(`nav-${s}`).classList.remove('active');
                     document.getElementById(`${s}-section`).classList.remove('active');
                 });
+                document.getElementById('run-detail-section').classList.remove('active');
 
                 // Activer le bouton et la section cliqués
                 document.getElementById(`nav-${section}`).classList.add('active');
@@ -2819,7 +2822,8 @@ function updateGoalProgress() {
                 document.getElementById(`nav-${s}`).classList.remove('active');
                 document.getElementById(`${s}-section`).classList.remove('active');
             });
-            
+            document.getElementById('run-detail-section').classList.remove('active');
+
             // Activer la section "Courir"
             document.getElementById('nav-run').classList.add('active');
             document.getElementById('run-section').classList.add('active');
@@ -3621,6 +3625,7 @@ function loadTrainingPlan() {
                 document.getElementById(`nav-${s}`).classList.remove('active');
                 document.getElementById(`${s}-section`).classList.remove('active');
             });
+            document.getElementById('run-detail-section').classList.remove('active');
 
             document.getElementById('nav-stats').classList.add('active');
             document.getElementById('stats-section').classList.add('active');

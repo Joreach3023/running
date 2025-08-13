@@ -20,6 +20,7 @@
     <title>RunPacer - Votre Coach de Course</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -254,11 +255,22 @@
             text-align: center;
             margin: 16px 0;
         }
-        
+
         .big-metric-label {
             text-align: center;
             color: var(--muted-color);
             margin-bottom: var(--spacing);
+        }
+
+        .digital-display {
+            font-family: 'Orbitron', monospace;
+            background-color: #000;
+            color: #00ff00;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: inline-block;
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px #00ff00;
         }
         
         .metrics-row {
@@ -984,7 +996,7 @@ body.dark-mode .splash-version {
             
             <div class="card">
                 <div class="big-metric-label">Rythme actuel</div>
-                <div class="big-metric" id="current-pace">--:--</div>
+                <div class="big-metric digital-display" id="current-pace">--:--</div>
                 <div id="pace-feedback" class="good-pace">Prêt à commencer</div>
             </div>
 

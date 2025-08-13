@@ -210,8 +210,6 @@
         }
         
         .btn {
-            background-color: var(--primary-color);
-            color: white;
             border: none;
             padding: 10px 16px;
             border-radius: 4px;
@@ -220,27 +218,61 @@
             margin-top: 10px;
             display: inline-flex;
             align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s, color 0.2s, transform 0.2s,
+                box-shadow 0.2s;
         }
-        
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px var(--shadow-color);
+        }
+
         .btn i {
             margin-right: 8px;
         }
-        
+
         .btn-lg {
             padding: 14px 20px;
             font-size: 1.1rem;
         }
-        
-        .btn-warning {
-            background-color: var(--warning-color);
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: var(--on-primary-color);
         }
 
-        .btn-success {
+        .btn-secondary {
             background-color: var(--secondary-color);
+            color: var(--on-primary-color);
+        }
+
+        .btn-ghost {
+            background-color: transparent;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+        }
+
+        .btn-ghost:hover {
+            background-color: var(--primary-color);
+            color: var(--on-primary-color);
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: var(--on-primary-color);
         }
 
         .btn-strava {
             background-color: var(--strava-color);
+            color: var(--on-primary-color);
+        }
+
+        .btn-primary:hover,
+        .btn-secondary:hover,
+        .btn-warning:hover,
+        .btn-strava:hover {
+            filter: brightness(1.1);
         }
         
         .run-controls {
@@ -873,7 +905,7 @@ body.dark-mode .splash-version {
             <h2>Bienvenue sur RunPacer 👋</h2>
             <p>Comment t'appelles-tu ?</p>
             <input type="text" id="onboard-name" class="form-control" placeholder="Votre prénom">
-            <button class="btn btn-success" id="onboard-next-1" style="margin-top:16px;">Suivant</button>
+            <button class="btn btn-primary" id="onboard-next-1" style="margin-top:16px;">Suivant</button>
         </div>
         <div class="onboarding-step" id="onboard-step-2">
             <h2>Ton rapport avec la course</h2>
@@ -884,7 +916,7 @@ body.dark-mode .splash-version {
                 <label><input type="radio" name="run-habit" value="course"> 🎯 Je m'entraîne pour une course précise</label>
                 <label><input type="radio" name="run-habit" value="postpartum"> 🤱 Postpartum (retour progressif)</label>
             </div>
-            <button class="btn btn-success" id="onboard-next-2" style="margin-top:16px;">Suivant</button>
+            <button class="btn btn-primary" id="onboard-next-2" style="margin-top:16px;">Suivant</button>
         </div>
         <div class="onboarding-step" id="onboard-step-3">
             <h2>Pourquoi RunPacer existe ? 📍</h2>
@@ -895,12 +927,12 @@ body.dark-mode .splash-version {
                 <li>🌱 Progression douce : adaptée à ton niveau</li>
                 <li>🤝 Motivation : on est là avec toi, course après course</li>
             </ul>
-            <button class="btn btn-success" id="onboard-next-3" style="margin-top:16px;">Suivant</button>
+            <button class="btn btn-primary" id="onboard-next-3" style="margin-top:16px;">Suivant</button>
         </div>
         <div class="onboarding-step" id="onboard-step-4">
             <h2>Prêt à créer ton premier plan d'entraînement ? 🏁</h2>
-            <button class="btn btn-success" id="onboard-create" style="margin-top:16px;">Créer mon programme</button>
-            <button class="btn" id="onboard-skip" style="margin-top:8px;">Je le ferai plus tard</button>
+            <button class="btn btn-primary" id="onboard-create" style="margin-top:16px;">Créer mon programme</button>
+            <button class="btn btn-ghost" id="onboard-skip" style="margin-top:8px;">Je le ferai plus tard</button>
         </div>
     </div>
     <div id="countdown-overlay"></div>
@@ -936,7 +968,7 @@ body.dark-mode .splash-version {
                     <p>Distance: <strong id="next-session-distance">5 km</strong></p>
                     <p>Rythme cible: <strong id="next-session-pace">5:00 min/km</strong></p>
                     <p id="next-session-goal">Objectif: Récupération active, travail cardiovasculaire léger</p>
-                    <button class="btn btn-success" id="start-run-btn" title="Démarrer la course"><i class="fas fa-play"></i></button>
+                    <button class="btn btn-secondary" id="start-run-btn" title="Démarrer la course"><i class="fas fa-play"></i></button>
                 </div>
             </div>
             <div class="card">
@@ -1025,7 +1057,7 @@ body.dark-mode .splash-version {
             </div>
             
             <div class="run-controls">
-                <button class="btn btn-lg btn-success" id="pause-btn" title="Démarrer la course"><i class="fas fa-play"></i></button>
+                <button class="btn btn-lg btn-secondary" id="pause-btn" title="Démarrer la course"><i class="fas fa-play"></i></button>
                 <button class="btn btn-lg btn-warning" id="stop-btn" disabled><i class="fas fa-stop"></i></button>
             </div>
             
@@ -1198,7 +1230,7 @@ body.dark-mode .splash-version {
                         <div id="strava-status" class="form-hint"></div>
                     </div>
                     
-                    <button type="submit" class="btn btn-success">Enregistrer les modifications</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
                 </form>
             </div>
         </div>
@@ -1268,7 +1300,7 @@ body.dark-mode .splash-version {
                 </div>
             </div>
             
-            <button type="submit" class="btn btn-success">Générer le plan</button>
+            <button type="submit" class="btn btn-primary">Générer le plan</button>
         </form>
     </div>
     
@@ -1290,7 +1322,7 @@ body.dark-mode .splash-version {
                 <!-- Le plan généré sera affiché ici -->
             </tbody>
         </table>
-        <button class="btn" id="save-plan-btn"><i class="fas fa-save"></i> Sauvegarder ce plan</button>
+        <button class="btn btn-secondary" id="save-plan-btn"><i class="fas fa-save"></i> Sauvegarder ce plan</button>
     </div>
 </div>
         
@@ -1345,10 +1377,10 @@ body.dark-mode .splash-version {
             </div>
             
             <div class="run-controls">
-                <button class="btn" id="share-run-btn"><i class="fas fa-share-alt"></i> Partager</button>
-                <button class="btn" id="export-gpx-btn"><i class="fas fa-file-export"></i> Exporter GPX</button>
-                <button class="btn" id="strava-upload-btn"><i class="fab fa-strava"></i> Strava</button>
-                <button class="btn" id="back-to-stats-btn"><i class="fas fa-arrow-left"></i> Retour</button>
+                <button class="btn btn-ghost" id="share-run-btn"><i class="fas fa-share-alt"></i> Partager</button>
+                <button class="btn btn-ghost" id="export-gpx-btn"><i class="fas fa-file-export"></i> Exporter GPX</button>
+                <button class="btn btn-ghost" id="strava-upload-btn"><i class="fab fa-strava"></i> Strava</button>
+                <button class="btn btn-ghost" id="back-to-stats-btn"><i class="fas fa-arrow-left"></i> Retour</button>
             </div>
         </div>
     </div>
@@ -2429,7 +2461,7 @@ function updateGoalProgress() {
                     <td>${run.distance} km</td>
                     <td>${run.pace} min/km</td>
                     <td>
-                        <button class="btn" onclick="showRunDetails(${index})"><i class="fas fa-eye"></i> Voir</button>
+                        <button class="btn btn-ghost" onclick="showRunDetails(${index})"><i class="fas fa-eye"></i> Voir</button>
                     </td>
                 `;
                 

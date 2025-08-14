@@ -1561,6 +1561,27 @@ body.dark-mode .splash-version {
             console.warn('BackgroundGeolocation plugin non disponible. Vérifie l\u2019installation native.');
         }
 
+        const HAPTICS = window.Capacitor?.Plugins?.Haptics;
+
+        function triggerLightHaptic() {
+            try {
+                if (HAPTICS?.impact) {
+                    const ImpactStyle = HAPTICS.ImpactStyle;
+                    HAPTICS.impact({ style: ImpactStyle?.Light || 'light' });
+                } else if (navigator.vibrate) {
+                    navigator.vibrate(5);
+                }
+            } catch (e) {
+                console.warn('Haptics error', e);
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('button')) {
+                triggerLightHaptic();
+            }
+        }, { passive: true });
+
         // Variables pour le suivi en arrière-plan
         let isBackgroundRun = false;
         let backgroundRunInterval;

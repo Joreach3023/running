@@ -15,6 +15,7 @@
     "mocha": "^11.7.1"
   },
   "dependencies": {
-    "@capacitor-community/background-geolocation": "^1.2.25"
+    "@capacitor-community/background-geolocation": "^1.2.25",
+    "@capacitor/haptics": "^7.0.2"
   }
 }

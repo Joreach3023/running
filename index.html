@@ -50,7 +50,7 @@
         }
 
         @media (prefers-color-scheme: dark) {
-            :root {
+            body:not(.light-mode) {
                 --background-color: #121212;
                 --surface-color: #1e1e1e;
                 --surface-alt-color: #2a2a2a;
@@ -1630,6 +1630,7 @@ function refreshIcons() {
 
 function applyTheme(theme) {
     document.body.classList.toggle('dark-mode', theme === 'dark');
+    document.body.classList.toggle('light-mode', theme === 'light');
     const toggle = document.getElementById('theme-toggle');
     if (toggle) {
         toggle.innerHTML = theme === 'dark' ? '<i data-lucide="sun"></i>' : '<i data-lucide="moon"></i>';
@@ -3735,7 +3736,8 @@ function loadTrainingPlan() {
 
         // Mettre à jour l'affichage
         updateProfileDisplay();
-        applyTheme(userData.theme || 'light');
+        const defaultTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        applyTheme(userData.theme || defaultTheme);
     } else {
         applyTheme(userData.theme);
         document.getElementById('profile-name-input').value = userData.firstName;

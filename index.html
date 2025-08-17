@@ -1523,7 +1523,19 @@ body.dark-mode .splash-version {
         // Configuration initiale
         const STRAVA_CLIENT_ID = '169011';
         const STRAVA_CLIENT_SECRET = '6e9f34aa96365b1daf849922ba15c9d003af824b';
-        const STRAVA_REDIRECT_URI = window.location.origin + window.location.pathname;
+
+        const isIOSCapacitor = typeof window !== 'undefined'
+            && window.Capacitor
+            && typeof Capacitor.getPlatform === 'function'
+            && Capacitor.getPlatform() === 'ios';
+
+        const IOS_SCHEME = 'runpacer';
+        const IOS_CALLBACK_HOST = 'joreach3023.github.io';
+        const IOS_REDIRECT_URI = `${IOS_SCHEME}://${IOS_CALLBACK_HOST}/strava-callback`;
+
+        const WEB_REDIRECT_URI = 'https://joreach3023.github.io/running/strava-callback';
+
+        const STRAVA_REDIRECT_URI = isIOSCapacitor ? IOS_REDIRECT_URI : WEB_REDIRECT_URI;
         const MONTHLY_GOAL_KM = 100; // objectif mensuel par défaut
         const userData = {
             firstName: '',

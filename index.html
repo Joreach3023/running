@@ -1522,7 +1522,6 @@ body.dark-mode .splash-version {
     <script>
         // Configuration initiale
         const STRAVA_CLIENT_ID = '169011';
-        const STRAVA_CLIENT_SECRET = '6e9f34aa96365b1daf849922ba15c9d003af824b';
 
         const isIOSCapacitor = typeof window !== 'undefined'
             && window.Capacitor
@@ -1536,6 +1535,10 @@ body.dark-mode .splash-version {
         const WEB_REDIRECT_URI = 'https://joreach3023.github.io/running/strava-callback';
 
         const STRAVA_REDIRECT_URI = isIOSCapacitor ? IOS_REDIRECT_URI : WEB_REDIRECT_URI;
+        const STRAVA_AUTH_BASE = isIOSCapacitor
+            ? "https://www.strava.com/oauth/mobile/authorize"
+            : "https://www.strava.com/oauth/authorize";
+        const API_BASE = "https://runpacer-backend-5rn3i8vbc-jonathan-labbes-projects.vercel.app";
         const MONTHLY_GOAL_KM = 100; // objectif mensuel par défaut
         const userData = {
             firstName: '',
@@ -3733,7 +3736,9 @@ function loadTrainingPlan() {
 
         const params = new URLSearchParams(window.location.search);
         if (params.has('code')) {
-            exchangeStravaCode(params.get('code')).catch(e => alert('Erreur Strava: ' + e.message));
+            exchangeCodeOnServer(params.get('code'))
+                .then(saveTokens)
+                .catch(e => alert('Erreur Strava: ' + e.message));
             history.replaceState({}, '', window.location.pathname);
         }
         
@@ -3920,25 +3925,34 @@ function loadTrainingPlan() {
         }
 
         function connectStrava() {
-            const url = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&scope=activity:write&approval_prompt=auto`;
+            const url = `${STRAVA_AUTH_BASE}?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&response_type=code&approval_prompt=auto&scope=read,activity:read,activity:write`;
             window.location.href = url;
         }
 
-        async function exchangeStravaCode(code) {
-            const params = new URLSearchParams();
-            params.append('client_id', STRAVA_CLIENT_ID);
-            params.append('client_secret', STRAVA_CLIENT_SECRET);
-            params.append('code', code);
-            params.append('grant_type', 'authorization_code');
-            const resp = await fetch('https://www.strava.com/oauth/token', {
+        async function exchangeCodeOnServer(code) {
+            const r = await fetch(`${API_BASE}/api/strava-token`, {
                 method: 'POST',
-                body: params
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
             });
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.message || 'Erreur');
-            userData.stravaToken = data.access_token;
-            userData.stravaRefreshToken = data.refresh_token;
-            userData.stravaExpiresAt = data.expires_at;
+            if (!r.ok) throw new Error('Erreur');
+            return r.json();
+        }
+
+        async function refreshOnServer(refresh_token) {
+            const r = await fetch(`${API_BASE}/api/strava-refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token })
+            });
+            if (!r.ok) throw new Error('Erreur');
+            return r.json();
+        }
+
+        function saveTokens(tokens) {
+            userData.stravaToken = tokens.access_token;
+            userData.stravaRefreshToken = tokens.refresh_token;
+            userData.stravaExpiresAt = tokens.expires_at;
             localStorage.setItem('runPacerUserData', JSON.stringify(userData));
             document.getElementById('strava-status').textContent = 'Connecté';
             connections.connectStrava();
@@ -3948,24 +3962,15 @@ function loadTrainingPlan() {
             if (!userData.stravaToken) return false;
             const now = Math.floor(Date.now() / 1000);
             if (userData.stravaExpiresAt && now >= userData.stravaExpiresAt - 60) {
-                const params = new URLSearchParams();
-                params.append('client_id', STRAVA_CLIENT_ID);
-                params.append('client_secret', STRAVA_CLIENT_SECRET);
-                params.append('grant_type', 'refresh_token');
-                params.append('refresh_token', userData.stravaRefreshToken);
-                const resp = await fetch('https://www.strava.com/oauth/token', {
-                    method: 'POST',
-                    body: params
-                });
-                const data = await resp.json();
-                if (!resp.ok) throw new Error(data.message || 'Erreur');
-                userData.stravaToken = data.access_token;
-                userData.stravaRefreshToken = data.refresh_token;
-                userData.stravaExpiresAt = data.expires_at;
-                localStorage.setItem('runPacerUserData', JSON.stringify(userData));
+                const data = await refreshOnServer(userData.stravaRefreshToken);
+                saveTokens(data);
             }
             return true;
         }
+
+        window.exchangeCodeOnServer = exchangeCodeOnServer;
+        window.refreshOnServer = refreshOnServer;
+        window.saveTokens = saveTokens;
 
         async function publishToStrava(run) {
             if (!userData.stravaToken) {

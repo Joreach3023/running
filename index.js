@@ -1,13 +1,11 @@
 import { App } from '@capacitor/app';
 
-App.addListener('appUrlOpen', (event) => {
-  if (event.url && event.url.startsWith('runpacer://')) {
-    const code = new URL(event.url).searchParams.get('code');
-    if (code) {
-      console.log('Strava code reçu:', code);
-      if (window.exchangeStravaCode) {
-        window.exchangeStravaCode(code).catch(err => console.error('Erreur Strava: ' + err.message));
-      }
+App.addListener('appUrlOpen', async ({ url }) => {
+  if (url?.startsWith('runpacer://')) {
+    const code = new URL(url).searchParams.get('code');
+    if (code && window.exchangeCodeOnServer && window.saveTokens) {
+      const tokens = await window.exchangeCodeOnServer(code);
+      window.saveTokens(tokens);
     }
   }
 });

@@ -19,8 +19,7 @@ $ xdg-open index.html  # or open the file in your browser of choice
 
 That's it—RunPacer is ready to use.
 
-To enable Strava uploads, set your Strava API client ID and secret in `index.html` and click the link icon in the profile section to authorize the app.
-
+To enable Strava uploads, set your Strava API client ID in `index.html` and click the link icon in the profile section to authorize the app. The Strava client secret is handled server-side, so you don't need to include it in the frontend.
 
 ## Confidentialite
 

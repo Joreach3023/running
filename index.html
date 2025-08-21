@@ -1542,9 +1542,6 @@ body.dark-mode .splash-version {
             eventDate: "2025-06-07",
             trainingDays: ["tuesday", "thursday", "sunday"],
             voiceEnabled: true,
-            stravaToken: "",
-            stravaRefreshToken: "",
-            stravaExpiresAt: 0,
             runs: [], // Historique des courses
             trainingPlan: [], // Plan d'entraînement généré
             customPlan: null, // Stockera le plan personnalisé généré
@@ -2806,7 +2803,7 @@ function updateGoalProgress() {
             userData.currentPace = document.getElementById('current-pace-input').value;
             userData.targetPace = document.getElementById('target-pace-input').value;
             userData.eventDate = document.getElementById('event-date-input').value;
-            document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
+            document.getElementById('strava-status').textContent = RunpacerConnections.getConnections().stravaToken ? 'Connecté' : 'Non connecté';
             
             // Mettre à jour les jours d'entraînement
             userData.trainingDays = [];
@@ -3697,12 +3694,15 @@ function loadTrainingPlan() {
     if (savedData) {
         const parsedData = JSON.parse(savedData);
         Object.assign(userData, parsedData);
-        
+        delete userData.stravaToken;
+        delete userData.stravaRefreshToken;
+        delete userData.stravaExpiresAt;
+
         // Mettre à jour le formulaire avec les données sauvegardées
         document.getElementById('current-pace-input').value = userData.currentPace;
         document.getElementById('target-pace-input').value = userData.targetPace;
         document.getElementById('event-date-input').value = userData.eventDate;
-        document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
+        document.getElementById('strava-status').textContent = RunpacerConnections.getConnections().stravaToken ? 'Connecté' : 'Non connecté';
         document.getElementById('profile-name-input').value = userData.firstName || '';
         document.getElementById('profile-run-habit').value = userData.runHabit || 'debutant';
         document.getElementById('profile-run-habit').addEventListener('change', function() {
@@ -3935,38 +3935,12 @@ function loadTrainingPlan() {
             if (!r.ok) throw new Error('Erreur');
             return r.json();
         }
-
-        async function refreshOnServer(refresh_token) {
-            const r = await fetch(`${API_BASE}/api/strava-refresh`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh_token })
-            });
-            if (!r.ok) throw new Error('Erreur');
-            return r.json();
-        }
-
         function saveTokens(tokens) {
-            userData.stravaToken = tokens.access_token;
-            userData.stravaRefreshToken = tokens.refresh_token;
-            userData.stravaExpiresAt = tokens.expires_at;
-            localStorage.setItem('runPacerUserData', JSON.stringify(userData));
-            document.getElementById('strava-status').textContent = 'Connecté';
+            RunpacerConnections.saveStravaTokens(tokens);
             connections.connectStrava();
         }
 
-        async function ensureValidAccessToken(state) {
-            const now = Math.floor(Date.now() / 1000);
-            if (now >= (state.stravaExpiresAt - 60)) {
-                const nd = await refreshOnServer(state.stravaRefreshToken);
-                saveTokens(nd);
-                return nd.access_token;
-            }
-            return state.stravaToken;
-        }
-
         window.exchangeCodeOnServer = exchangeCodeOnServer;
-        window.refreshOnServer = refreshOnServer;
         window.saveTokens = saveTokens;
 
         if (!isIOSCapacitor) {
@@ -3980,13 +3954,15 @@ function loadTrainingPlan() {
         }
 
         async function publishToStrava(run) {
-            if (!userData.stravaToken) {
+            const conn = RunpacerConnections.getConnections();
+            if (!conn.stravaToken) {
                 alert("Connectez votre compte Strava dans le profil");
                 return;
             }
 
             try {
-                const token = await ensureValidAccessToken(userData);
+                const token = await RunpacerConnections.ensureValidToken();
+                if (!token) throw new Error('Token invalide');
                 if (run.gpsData && run.gpsData.length >= 2) {
                     const gpxContent = generateGPX(run);
                     const formData = new FormData();
@@ -4055,8 +4031,8 @@ function loadTrainingPlan() {
                 const code = new URL(url).searchParams.get('code');
                 if (!code) return;
 
-                const tokens = await exchangeCodeOnServer(code); // appelle ton backend Vercel
-                saveTokens(tokens); // met à jour userData + localStorage + UI
+        const tokens = await exchangeCodeOnServer(code); // appelle ton backend Vercel
+        saveTokens(tokens); // enregistre les tokens et met à jour l'UI
             } catch (e) {
                 console.error('appUrlOpen error', e);
                 alert('Erreur de connexion Strava. Réessaie.');

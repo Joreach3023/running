@@ -3716,14 +3716,6 @@ function loadTrainingPlan() {
         }
         updateHabitUI();
 
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('code')) {
-            exchangeCodeOnServer(params.get('code'))
-                .then(saveTokens)
-                .catch(e => alert('Erreur Strava: ' + e.message));
-            history.replaceState({}, '', window.location.pathname);
-        }
-        
         // Jours d'entraînement
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         days.forEach(day => {
@@ -3910,34 +3902,26 @@ function loadTrainingPlan() {
         // gérer la logique de redirection Strava. Cela évite la duplication
         // de code et garantit que le bouton fonctionne correctement sur
         // toutes les plateformes prises en charge.
-        document.getElementById('strava-connect-btn')?.addEventListener('click', () => {
-            RunpacerConnections.connectStrava();
-        });
+        document.getElementById('strava-connect-btn')?.addEventListener('click', RunpacerConnections.connectStrava);
 
-        async function exchangeCodeOnServer(code) {
-            const r = await fetch(`${API_BASE}/api/strava-token`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code })
-            });
-            if (!r.ok) throw new Error('Erreur');
-            return r.json();
-        }
-        function saveTokens(tokens) {
-            RunpacerConnections.saveStravaTokens(tokens);
-            RunpacerConnections.connectStrava();
-        }
-
-        window.exchangeCodeOnServer = exchangeCodeOnServer;
-        window.saveTokens = saveTokens;
-
-        if (!isIOSCapacitor) {
+        if (!window.Capacitor) {
             const code = new URL(window.location.href).searchParams.get('code');
-            if (code) {
-                exchangeCodeOnServer(code).then(t => {
-                    saveTokens(t);
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                });
+            if (code && !StravaAuthState.handled && !StravaAuthState.inProgress) {
+                StravaAuthState.inProgress = true;
+                RunpacerConnections.exchangeCodeOnServer(code)
+                    .then((data) => {
+                        if (!data?.access_token) throw new Error('NO_TOKEN');
+                        RunpacerConnections.saveStravaTokens(data);
+                        document.getElementById('strava-status')?.replaceChildren('Connecté ✅');
+                        StravaAuthState.handled = true;
+                    })
+                    .catch((e) => {
+                        if (!StravaAuthState.handled) alert('Erreur de connexion Strava. Réessaie.');
+                    })
+                    .finally(() => {
+                        history.replaceState({}, document.title, window.location.pathname);
+                        StravaAuthState.inProgress = false;
+                    });
             }
         }
 
@@ -4008,26 +3992,7 @@ function loadTrainingPlan() {
             }
         });
 
-        // iOS (Capacitor) : capter le retour runpacer://...?code=...
-        window.Capacitor?.Plugins?.App?.addListener('appUrlOpen', async ({ url }) => {
-            try {
-                if (!url || !url.startsWith('runpacer://')) return;
-
-                // Fermer la webview d'auth si ouverte
-                try { await window.Capacitor?.Plugins?.Browser?.close(); } catch (_) {}
-
-                const code = new URL(url).searchParams.get('code');
-                if (!code) return;
-
-        const tokens = await exchangeCodeOnServer(code); // appelle ton backend Vercel
-        saveTokens(tokens); // enregistre les tokens et met à jour l'UI
-            } catch (e) {
-                console.error('appUrlOpen error', e);
-                alert('Erreur de connexion Strava. Réessaie.');
-            }
-        });
     </script>
-    <script type="module" src="index.js"></script>
     <footer><a href="PRIVACY.md">Politique de confidentialite</a></footer>
 </body>
 </html>

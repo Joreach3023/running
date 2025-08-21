@@ -3,6 +3,11 @@
 (() => {
   const API_BASE = "https://runpacer-backend-5rn3i8vbc-jonathan-labbes-projects.vercel.app";
 
+  const StravaAuthState = {
+    inProgress: false,
+    handled: false
+  };
+
   // --- Stockage centralisé ---
   function getConnections() {
     try {
@@ -105,6 +110,8 @@
   }
 
   async function connectStrava() {
+    if (StravaAuthState.inProgress) return;
+    StravaAuthState.inProgress = true;
     const url = buildStravaAuthUrl();
 
     // iOS: ouvrir dans Capacitor Browser, Web: rediriger
@@ -122,21 +129,27 @@
 
   // --- (Optionnel ici) Listener iOS pour récupérer le deep link ---
   // Si tu l’as déjà mis dans index.html, tu peux supprimer ce bloc.
+  let appListener;
   if (window.Capacitor?.Plugins?.App && window.Capacitor?.Plugins?.Browser) {
-    window.Capacitor.Plugins.App.addListener("appUrlOpen", async ({ url }) => {
+    appListener = window.Capacitor.Plugins.App.addListener("appUrlOpen", async ({ url }) => {
+      if (!url?.startsWith("runpacer://")) return;
+      if (StravaAuthState.handled || StravaAuthState.inProgress) return;
+      StravaAuthState.inProgress = true;
       try {
-        if (!url || !url.startsWith("runpacer://")) return;
         try { await window.Capacitor.Plugins.Browser.close(); } catch (_) {}
         const code = new URL(url).searchParams.get("code");
-        if (!code) return;
-        const tokens = await exchangeCodeOnServer(code);
-        saveStravaTokens(tokens);
-        // Feedback utilisateur
+        if (!code) throw new Error("NO_CODE");
+        const data = await exchangeCodeOnServer(code);
+        if (!data?.access_token) throw new Error("NO_TOKEN");
+        saveStravaTokens(data);
         const el = document.getElementById("strava-status");
         if (el) el.textContent = "Connecté ✅";
+        StravaAuthState.handled = true;
       } catch (e) {
-        console.error("appUrlOpen error", e);
-        alert("Erreur de connexion Strava. Réessaie.");
+        if (!StravaAuthState.handled) alert("Erreur de connexion Strava. Réessaie.");
+      } finally {
+        StravaAuthState.inProgress = false;
+        try { await appListener?.remove?.(); } catch (_) {}
       }
     });
   }
@@ -148,8 +161,10 @@
     ensureValidToken,
     // utilitaires si besoin
     saveStravaTokens,
+    exchangeCodeOnServer,
     getConnections,
     shouldShowOnboarding,
     setOnboardingShown
   };
+  window.StravaAuthState = StravaAuthState;
 })();

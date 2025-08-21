@@ -1303,12 +1303,6 @@ body.dark-mode .splash-version {
                     </div>
 
                     <div class="form-group">
-                        <label for="strava-token-input">Token d'accès Strava</label>
-                        <input type="text" class="form-control" id="strava-token-input" placeholder="OAuth token">
-                        <div class="form-hint">Générez un token depuis votre compte Strava</div>
-                    </div>
-
-                    <div class="form-group">
                         <button type="button" class="btn btn-strava" id="strava-connect-btn" title="Connecter Strava"><i data-lucide="link"></i></button>
                         <div id="strava-status" class="form-hint"></div>
                     </div>
@@ -1559,10 +1553,6 @@ body.dark-mode .splash-version {
         };
 
         // Détecter l'exécution sous Capacitor iOS pour désactiver le Service Worker
-        const isIOSCapacitor = typeof window !== 'undefined'
-            && window.Capacitor
-            && typeof Capacitor.getPlatform === 'function'
-            && Capacitor.getPlatform() === 'ios';
         const canUseServiceWorkers = 'serviceWorker' in navigator && !isIOSCapacitor;
 
         const BG = window.Capacitor?.Plugins?.BackgroundGeolocation;
@@ -2816,13 +2806,7 @@ function updateGoalProgress() {
             userData.currentPace = document.getElementById('current-pace-input').value;
             userData.targetPace = document.getElementById('target-pace-input').value;
             userData.eventDate = document.getElementById('event-date-input').value;
-            userData.stravaToken = document.getElementById('strava-token-input').value;
             document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
-            if (userData.stravaToken) {
-                connections.connectStrava();
-            } else {
-                connections.disconnectStrava();
-            }
             
             // Mettre à jour les jours d'entraînement
             userData.trainingDays = [];
@@ -3718,9 +3702,7 @@ function loadTrainingPlan() {
         document.getElementById('current-pace-input').value = userData.currentPace;
         document.getElementById('target-pace-input').value = userData.targetPace;
         document.getElementById('event-date-input').value = userData.eventDate;
-        document.getElementById('strava-token-input').value = userData.stravaToken || '';
         document.getElementById('strava-status').textContent = userData.stravaToken ? 'Connecté' : 'Non connecté';
-        document.getElementById('strava-connect-btn').onclick = connectStrava;
         document.getElementById('profile-name-input').value = userData.firstName || '';
         document.getElementById('profile-run-habit').value = userData.runHabit || 'debutant';
         document.getElementById('profile-run-habit').addEventListener('change', function() {
@@ -3924,10 +3906,25 @@ function loadTrainingPlan() {
             }
         }
 
-        function connectStrava() {
-            const url = `${STRAVA_AUTH_BASE}?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&response_type=code&approval_prompt=auto&scope=read,activity:read,activity:write`;
-            window.location.href = url;
+        function buildStravaAuthUrl() {
+            const params = new URLSearchParams({
+                client_id: String(STRAVA_CLIENT_ID),
+                redirect_uri: STRAVA_REDIRECT_URI,
+                response_type: 'code',
+                approval_prompt: 'auto',
+                scope: 'read,activity:read,activity:write'
+            });
+            return `${STRAVA_AUTH_BASE}?${params.toString()}`;
         }
+
+        document.getElementById('strava-connect-btn')?.addEventListener('click', async () => {
+            const url = buildStravaAuthUrl();
+            if (isIOSCapacitor) {
+                await window.Capacitor?.Plugins?.Browser.open({ url, presentationStyle: 'popover' });
+            } else {
+                window.location.href = url;
+            }
+        });
 
         async function exchangeCodeOnServer(code) {
             const r = await fetch(`${API_BASE}/api/strava-token`, {
@@ -3958,19 +3955,29 @@ function loadTrainingPlan() {
             connections.connectStrava();
         }
 
-        async function ensureStravaToken() {
-            if (!userData.stravaToken) return false;
+        async function ensureValidAccessToken(state) {
             const now = Math.floor(Date.now() / 1000);
-            if (userData.stravaExpiresAt && now >= userData.stravaExpiresAt - 60) {
-                const data = await refreshOnServer(userData.stravaRefreshToken);
-                saveTokens(data);
+            if (now >= (state.stravaExpiresAt - 60)) {
+                const nd = await refreshOnServer(state.stravaRefreshToken);
+                saveTokens(nd);
+                return nd.access_token;
             }
-            return true;
+            return state.stravaToken;
         }
 
         window.exchangeCodeOnServer = exchangeCodeOnServer;
         window.refreshOnServer = refreshOnServer;
         window.saveTokens = saveTokens;
+
+        if (!isIOSCapacitor) {
+            const code = new URL(window.location.href).searchParams.get('code');
+            if (code) {
+                exchangeCodeOnServer(code).then(t => {
+                    saveTokens(t);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                });
+            }
+        }
 
         async function publishToStrava(run) {
             if (!userData.stravaToken) {
@@ -3979,8 +3986,7 @@ function loadTrainingPlan() {
             }
 
             try {
-                await ensureStravaToken();
-                const token = userData.stravaToken;
+                const token = await ensureValidAccessToken(userData);
                 if (run.gpsData && run.gpsData.length >= 2) {
                     const gpxContent = generateGPX(run);
                     const formData = new FormData();

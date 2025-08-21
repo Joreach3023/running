@@ -4043,6 +4043,25 @@ function loadTrainingPlan() {
                 screen.orientation.lock('portrait').catch(() => {});
             }
         });
+
+        // iOS (Capacitor) : capter le retour runpacer://...?code=...
+        window.Capacitor?.Plugins?.App?.addListener('appUrlOpen', async ({ url }) => {
+            try {
+                if (!url || !url.startsWith('runpacer://')) return;
+
+                // Fermer la webview d'auth si ouverte
+                try { await window.Capacitor?.Plugins?.Browser?.close(); } catch (_) {}
+
+                const code = new URL(url).searchParams.get('code');
+                if (!code) return;
+
+                const tokens = await exchangeCodeOnServer(code); // appelle ton backend Vercel
+                saveTokens(tokens); // met à jour userData + localStorage + UI
+            } catch (e) {
+                console.error('appUrlOpen error', e);
+                alert('Erreur de connexion Strava. Réessaie.');
+            }
+        });
     </script>
     <script type="module" src="index.js"></script>
     <footer><a href="PRIVACY.md">Politique de confidentialite</a></footer>

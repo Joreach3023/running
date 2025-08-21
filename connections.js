@@ -16,6 +16,17 @@
     localStorage.setItem("runPacerConnections", JSON.stringify(obj || {}));
   }
 
+  function shouldShowOnboarding() {
+    const c = getConnections();
+    return !c.onboardingShown;
+  }
+
+  function setOnboardingShown() {
+    const c = getConnections();
+    c.onboardingShown = true;
+    setConnections(c);
+  }
+
   function saveStravaTokens(data) {
     const c = getConnections();
     c.stravaToken = data.access_token;
@@ -137,6 +148,8 @@
     ensureValidToken,
     // utilitaires si besoin
     saveStravaTokens,
-    getConnections
+    getConnections,
+    shouldShowOnboarding,
+    setOnboardingShown
   };
 })();

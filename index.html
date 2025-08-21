@@ -1532,9 +1532,6 @@ body.dark-mode .splash-version {
         const WEB_REDIRECT_URI = 'https://joreach3023.github.io/running/strava-callback';
 
         const STRAVA_REDIRECT_URI = isIOSCapacitor ? IOS_REDIRECT_URI : WEB_REDIRECT_URI;
-        const STRAVA_AUTH_BASE = isIOSCapacitor
-            ? "https://www.strava.com/oauth/mobile/authorize"
-            : "https://www.strava.com/oauth/authorize";
         const API_BASE = "https://runpacer-backend-5rn3i8vbc-jonathan-labbes-projects.vercel.app";
         const MONTHLY_GOAL_KM = 100; // objectif mensuel par défaut
         const userData = {
@@ -3909,24 +3906,12 @@ function loadTrainingPlan() {
             }
         }
 
-        function buildStravaAuthUrl() {
-            const params = new URLSearchParams({
-                client_id: String(STRAVA_CLIENT_ID),
-                redirect_uri: STRAVA_REDIRECT_URI,
-                response_type: 'code',
-                approval_prompt: 'auto',
-                scope: 'read,activity:read,activity:write'
-            });
-            return `${STRAVA_AUTH_BASE}?${params.toString()}`;
-        }
-
-        document.getElementById('strava-connect-btn')?.addEventListener('click', async () => {
-            const url = buildStravaAuthUrl();
-            if (isIOSCapacitor) {
-                await window.Capacitor?.Plugins?.Browser.open({ url, presentationStyle: 'popover' });
-            } else {
-                window.location.href = url;
-            }
+        // Utilise l'implémentation centralisée dans connections.js pour
+        // gérer la logique de redirection Strava. Cela évite la duplication
+        // de code et garantit que le bouton fonctionne correctement sur
+        // toutes les plateformes prises en charge.
+        document.getElementById('strava-connect-btn')?.addEventListener('click', () => {
+            RunpacerConnections.connectStrava();
         });
 
         async function exchangeCodeOnServer(code) {
@@ -3940,7 +3925,7 @@ function loadTrainingPlan() {
         }
         function saveTokens(tokens) {
             RunpacerConnections.saveStravaTokens(tokens);
-            connections.connectStrava();
+            RunpacerConnections.connectStrava();
         }
 
         window.exchangeCodeOnServer = exchangeCodeOnServer;

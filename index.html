@@ -12,6 +12,8 @@
     <script src="capacitor.js"></script>
     <!-- Connection and onboarding state -->
     <script src="connections.js"></script>
+    <!-- Boss Run client -->
+    <script src="boss.js"></script>
     <script>
         window.connections = window.RunpacerConnections;
     </script>
@@ -975,6 +977,8 @@ body.dark-mode .splash-version {
         .onboarding-step.active { display: block; }
         .onboarding-options { text-align: left; margin-top: 16px; }
         .onboarding-options label { display: block; margin-bottom: 8px; }
+        #boss-bar { width: 100%; height: 12px; background: var(--surface-alt2-color); border-radius: 4px; overflow: hidden; }
+        #boss-bar-fill { height: 100%; width: 0; background: var(--warning-color); }
     </style>
 </head>
 <body>
@@ -1029,6 +1033,7 @@ body.dark-mode .splash-version {
         <button id="nav-plan" class="active"><i data-lucide="calendar"></i> Plan</button>
         <button id="nav-run"><i data-lucide="activity"></i> Courir</button>
         <button id="nav-stats" style="color: var(--primary-color);" title="Voir stats">📊</button>
+        <button id="nav-boss"><i data-lucide="shield"></i> Boss</button>
         <button id="nav-profile"><i data-lucide="user"></i> Profil</button>
         <button id="nav-create-plan"><i data-lucide="calendar-plus"></i> Créer plan</button>
     </nav>
@@ -1157,7 +1162,18 @@ body.dark-mode .splash-version {
                 <i data-lucide="volume-2"></i>
             </div>
         </div>
-        
+        <!-- Section Boss -->
+        <div id="boss-section" class="section">
+            <div class="card">
+                <div class="card-title">Boss Run</div>
+                <div id="boss-bar"><div id="boss-bar-fill"></div></div>
+                <p>Temps restant: <span id="boss-timer">--:--</span></p>
+                <p>Votre contribution: <span id="boss-your">0</span> km</p>
+                <p>Top contributeur: <span id="boss-top">N/A</span></p>
+                <button class="btn btn-secondary" id="boss-refresh"><i data-lucide="refresh-cw"></i> Actualiser</button>
+            </div>
+        </div>
+
         <!-- Section Statistiques -->
         <div id="stats-section" class="section">
             <div class="stats-grid">
@@ -2766,7 +2782,7 @@ function updateGoalProgress() {
         });
         
         // Navigation entre les sections
-        const sections = ['plan', 'run', 'stats', 'profile', 'create-plan'];
+        const sections = ['plan', 'run', 'boss', 'stats', 'profile', 'create-plan'];
         
         sections.forEach(section => {
             document.getElementById(`nav-${section}`).addEventListener('click', () => {
@@ -2782,6 +2798,11 @@ function updateGoalProgress() {
                 document.getElementById(`${section}-section`).classList.add('active');
             });
         });
+
+        document.getElementById('boss-refresh').addEventListener('click', () => {
+            RunpacerBoss.refreshBossUI(userData);
+        });
+        RunpacerBoss.refreshBossUI(userData);
         
         // Gestion du formulaire de profil
         document.getElementById('profile-form').addEventListener('submit', function(e) {
@@ -3657,6 +3678,10 @@ function loadTrainingPlan() {
                 // Mise à jour des statistiques
                 updateHistory();
                 updateTrainingPlanDisplay();
+                if (window.RunpacerBoss) {
+                    RunpacerBoss.sendContribution(newRun, userData);
+                    RunpacerBoss.refreshBossUI(userData);
+                }
             }
 
             // Redirection vers la section des statistiques

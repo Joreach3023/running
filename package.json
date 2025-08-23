@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.25",
-    "@capacitor/haptics": "^7.0.2"
+    "@capacitor/haptics": "^7.0.2",
+    "@supabase/supabase-js": "^2.43.1"
   }
 }

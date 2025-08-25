@@ -3509,7 +3509,10 @@ function loadTrainingPlan() {
         
         // Mettre à jour uniquement le temps qui s'écoule
         function updateRunningTime() {
-            currentDuration++;
+            // Calculer la durée écoulée depuis le début de la course
+            if (runStartTimestamp) {
+                currentDuration = Math.floor((Date.now() - runStartTimestamp) / 1000);
+            }
             document.getElementById('duration').textContent = formatTime(currentDuration);
             
             // Annoncer la distance tous les kilomètres (fallback si GPS non disponible)
@@ -3563,6 +3566,8 @@ function loadTrainingPlan() {
         // Fonction pour reprendre la course
         async function resumeRun() {
             isRunning = true;
+            // Ajuster le timestamp de départ pour exclure le temps de pause
+            runStartTimestamp = Date.now() - (currentDuration * 1000);
             runInterval = setInterval(updateRunningTime, 1000);
             await startGpsTracking();
             

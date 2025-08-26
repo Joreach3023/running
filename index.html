@@ -219,7 +219,13 @@
         }
 
         .card.glow {
-            box-shadow: 0 0 8px var(--secondary-color);
+            background-color: var(--strava-color);
+            box-shadow: 0 0 10px 2px var(--strava-color), 0 0 20px 4px var(--strava-color);
+            color: var(--on-primary-color);
+        }
+
+        .card.glow .card-title {
+            color: var(--on-primary-color);
         }
         
         .card-title {

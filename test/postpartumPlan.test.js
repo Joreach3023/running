@@ -84,4 +84,29 @@ describe('postpartum plan generator', () => {
     const diffDays = (plan.weeks[1].sessions[1].date - plan.weeks[1].sessions[0].date) / (1000 * 60 * 60 * 24);
     expect(diffDays).to.be.at.least(2);
   });
+
+  it('active runner starts with higher initial volume', () => {
+    const profile = {
+      enabled: true,
+      weeksPostpartum: 16,
+      deliveryType: 'vaginal',
+      symptoms: {
+        leakage: false,
+        heaviness: false,
+        painAbdominalBack: false,
+        diastasisSuspected: false,
+        incisionPain: false,
+        abnormalBleeding: false,
+      },
+      activityLevel: 'active',
+      goal: 'run_5k_comfort',
+      medicalCleared: true,
+    };
+    const start = new Date('2024-01-01');
+    const plan = generatePostpartumPlan(profile, start);
+    expect(plan.weeks[0].totalRunMinutes).to.equal(30);
+    const [s1, s2] = plan.weeks[0].sessions;
+    const diffDays = (s2.date - s1.date) / (1000 * 60 * 60 * 24);
+    expect(diffDays).to.be.at.least(2);
+  });
 });

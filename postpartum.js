@@ -98,6 +98,15 @@ function createWalkPelvicPlan(start, weeks = 2) {
   return plan;
 }
 
+// Find the date of the last session in a plan
+function getPlanEndDate(weeks) {
+  if (!weeks || weeks.length === 0) return null;
+  const lastWeek = weeks[weeks.length - 1];
+  const sessions = lastWeek.sessions || [];
+  if (sessions.length === 0) return lastWeek.start;
+  return sessions[sessions.length - 1].date;
+}
+
 /**
  * Generate a postpartum running plan.
  * @param {Object} pp - profile
@@ -107,9 +116,18 @@ function createWalkPelvicPlan(start, weeks = 2) {
 function generatePostpartumPlan(pp, start) {
   const recommendations = GENERAL_RECOMMENDATIONS;
   const status = evaluateReadiness(pp);
-  if (status === "Stop") return { status, weeks: [], warning: "Symptômes nécessitant l'arrêt", recommendations };
+  if (status === "Stop") {
+    return { status, weeks: [], warning: "Symptômes nécessitant l'arrêt", recommendations, endDate: null };
+  }
   if (status === "DeferToWalkPelvic") {
-    return { status: "Defer", weeks: createWalkPelvicPlan(start), warning: "Reprise différée : marche + renforcement pelvien", recommendations };
+    const weeks = createWalkPelvicPlan(start);
+    return {
+      status: "Defer",
+      weeks,
+      warning: "Reprise différée : marche + renforcement pelvien",
+      recommendations,
+      endDate: getPlanEndDate(weeks)
+    };
   }
   const startTotal = getStartingTotal(pp);
   let weeks;
@@ -118,7 +136,7 @@ function generatePostpartumPlan(pp, start) {
   } else {
     weeks = createPlan(start, startTotal);
   }
-  return { status: "OK", weeks, recommendations };
+  return { status: "OK", weeks, recommendations, endDate: getPlanEndDate(weeks) };
 }
 
 /**
@@ -141,7 +159,7 @@ function applySymptoms(plan, weekNumber) {
   return plan;
 }
 
-const api = { evaluateReadiness, generatePostpartumPlan, applySymptoms };
+const api = { evaluateReadiness, generatePostpartumPlan, applySymptoms, getPlanEndDate };
 
 // Support both Node.js and browser environments
 if (typeof module !== 'undefined' && module.exports) {

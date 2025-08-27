@@ -22,6 +22,7 @@ describe('postpartum plan generator', () => {
     const start = new Date('2024-01-01');
     const plan = generatePostpartumPlan(profile, start);
     expect(plan.status).to.equal('OK');
+    expect(plan.recommendations).to.include('150');
     expect(plan.weeks[0].sessions).to.have.lengthOf(2);
     const [s1, s2] = plan.weeks[0].sessions;
     expect(s1.rpe).to.be.within(3, 4);
@@ -40,6 +41,9 @@ describe('postpartum plan generator', () => {
       const curr = plan.weeks[i].totalRunMinutes;
       expect(curr).to.be.at.most(prev * 1.15 + 0.1);
     }
+    const w3 = plan.weeks[2].totalRunMinutes;
+    const w4 = plan.weeks[3].totalRunMinutes;
+    expect(w4).to.be.closeTo(Math.round(w3 * 0.85), 0.1);
   });
 
   it('10 weeks without medical clearance -> walk + pelvic plan', () => {
@@ -62,6 +66,7 @@ describe('postpartum plan generator', () => {
     const start = new Date('2024-01-01');
     const plan = generatePostpartumPlan(profile, start);
     expect(plan.status).to.equal('Defer');
+    expect(plan.warning).to.match(/marche/);
     expect(plan.weeks).to.have.lengthOf(2);
     expect(plan.weeks[0].sessions[0].type).to.equal('walk');
   });

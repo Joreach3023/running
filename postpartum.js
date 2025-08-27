@@ -26,6 +26,19 @@ function evaluateReadiness(pp) {
   return "OK";
 }
 
+// Determine starting total run minutes based on profile
+function getStartingTotal(pp) {
+  if (pp.goal === "run_30min") return 40;
+  switch (pp.activityLevel) {
+    case "active":
+      return 30;
+    case "moderate":
+      return 25;
+    default:
+      return 20;
+  }
+}
+
 // Build one training week with two run sessions separated by 48h
 function buildWeek(start, totalRunMinutes) {
   const per = Math.round(totalRunMinutes / 2);
@@ -84,11 +97,11 @@ function generatePostpartumPlan(pp, start) {
   if (status === "DeferToWalkPelvic") {
     return { status: "Defer", weeks: createWalkPelvicPlan(start) };
   }
+  const startTotal = getStartingTotal(pp);
   if (pp.weeksPostpartum < 12) {
-    return { status: "OK", weeks: createPlan(start, 20) }; // phase2-like
+    return { status: "OK", weeks: createPlan(start, Math.min(20, startTotal)) }; // phase2-like
   }
   // phase3
-  const startTotal = pp.goal === "run_30min" ? 40 : 20;
   return { status: "OK", weeks: createPlan(start, startTotal) };
 }
 

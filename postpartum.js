@@ -73,15 +73,16 @@ function buildWeek(start, totalRunMinutes) {
   return { start, sessions, totalRunMinutes: run1 + run2 };
 }
 
-function createPlan(start, startingTotal) {
-  const weeks = [];
-  let total = startingTotal;
-  for (let i = 0; i < 4; i++) {
+const { generateWeeklyVolumes, GENERAL_RECOMMENDATIONS } = require('./trainingPlan');
+
+function createPlan(start, startingTotal, weeks = 4) {
+  const volumes = generateWeeklyVolumes(startingTotal, weeks);
+  const planWeeks = [];
+  for (let i = 0; i < weeks; i++) {
     const wStart = addDays(start, i * 7);
-    weeks.push(buildWeek(wStart, total));
-    total = Math.round(total * 1.1); // +10%
+    planWeeks.push(buildWeek(wStart, volumes[i]));
   }
-  return weeks;
+  return planWeeks;
 }
 
 function createWalkPelvicPlan(start, weeks = 2) {
@@ -104,17 +105,20 @@ function createWalkPelvicPlan(start, weeks = 2) {
  * @returns {Object} plan
  */
 function generatePostpartumPlan(pp, start) {
+  const recommendations = GENERAL_RECOMMENDATIONS;
   const status = evaluateReadiness(pp);
-  if (status === "Stop") return { status, weeks: [] };
+  if (status === "Stop") return { status, weeks: [], warning: "Symptômes nécessitant l'arrêt", recommendations };
   if (status === "DeferToWalkPelvic") {
-    return { status: "Defer", weeks: createWalkPelvicPlan(start) };
+    return { status: "Defer", weeks: createWalkPelvicPlan(start), warning: "Reprise différée : marche + renforcement pelvien", recommendations };
   }
   const startTotal = getStartingTotal(pp);
+  let weeks;
   if (pp.weeksPostpartum < 12) {
-    return { status: "OK", weeks: createPlan(start, Math.min(20, startTotal)) }; // phase2-like
+    weeks = createPlan(start, Math.min(20, startTotal)); // phase2-like
+  } else {
+    weeks = createPlan(start, startTotal);
   }
-  // phase3
-  return { status: "OK", weeks: createPlan(start, startTotal) };
+  return { status: "OK", weeks, recommendations };
 }
 
 /**

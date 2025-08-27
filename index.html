@@ -1916,7 +1916,14 @@ function generateCustomPlan() {
             
             // Ajuster pour la distance cible
             if (distance === 5) {
-                sessionDistance = Math.min(sessionDistance, 5);
+                // Pour un plan 5 km, démarre plus court et augmente jusqu'à 5 km
+                const startDist = 2; // distance de départ
+                let maxForWeek = 5;
+                if (weeksDiff > 1) {
+                    const weeklyProgress = (5 - startDist) / (weeksDiff - 1);
+                    maxForWeek = startDist + weeklyProgress * (week - 1);
+                }
+                sessionDistance = Math.min(sessionDistance, maxForWeek);
             } else if (distance === 21.1) {
                 // Pour semi-marathon
                 if (type === 'long') {

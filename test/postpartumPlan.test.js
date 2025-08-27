@@ -26,6 +26,13 @@ describe('postpartum plan generator', () => {
     const [s1, s2] = plan.weeks[0].sessions;
     expect(s1.rpe).to.be.within(3, 4);
     expect(s2.rpe).to.be.within(3, 4);
+    // intervals info
+    expect(s1.distanceKm).to.be.a('number');
+    expect(s2.distanceKm).to.be.a('number');
+    expect(s1.distanceKm).to.not.equal(s2.distanceKm); // varying distances
+    expect(s1.runMinutes).to.be.gt(0);
+    expect(s1.restMinutes).to.be.gt(0);
+    expect(s1.paceRun).to.be.lt(s1.paceRest); // run faster than rest
     const diffDays = (s2.date - s1.date) / (1000 * 60 * 60 * 24);
     expect(diffDays).to.be.at.least(2); // 48h rest
     for (let i = 1; i < plan.weeks.length; i++) {

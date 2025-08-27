@@ -39,26 +39,38 @@ function getStartingTotal(pp) {
   }
 }
 
-// Build one training week with two run sessions separated by 48h
+// Default paces (minutes per km)
+const RUN_PACE = 7;
+const REST_PACE = 12;
+
+// Helper to build a session with run/rest intervals
+function buildSession(date, type, runMin, restMin) {
+  const distance = runMin / RUN_PACE + restMin / REST_PACE;
+  return {
+    date,
+    type,
+    runMinutes: runMin,
+    restMinutes: restMin,
+    minutes: runMin + restMin,
+    rpe: 3,
+    distanceKm: Number(distance.toFixed(2)),
+    paceRun: RUN_PACE,
+    paceRest: REST_PACE,
+    tags: ["#Postpartum", "#ReturnToRun", "RPE3-4"],
+  };
+}
+
+// Build one training week with two interval sessions separated by 48h
 function buildWeek(start, totalRunMinutes) {
-  const per = Math.round(totalRunMinutes / 2);
+  const run1 = Math.round(totalRunMinutes * 0.4);
+  const run2 = totalRunMinutes - run1;
+  const rest1 = Math.round(run1 * 0.5);
+  const rest2 = Math.round(run2 * 0.25);
   const sessions = [
-    {
-      date: addDays(start, 0),
-      type: "run",
-      minutes: per,
-      rpe: 3,
-      tags: ["#Postpartum", "#ReturnToRun", "RPE3-4"],
-    },
-    {
-      date: addDays(start, 2),
-      type: "run",
-      minutes: per,
-      rpe: 3,
-      tags: ["#Postpartum", "#ReturnToRun", "RPE3-4"],
-    },
+    buildSession(addDays(start, 0), "interval_easy", run1, rest1),
+    buildSession(addDays(start, 2), "interval_long", run2, rest2),
   ];
-  return { start, sessions, totalRunMinutes: per * 2 };
+  return { start, sessions, totalRunMinutes: run1 + run2 };
 }
 
 function createPlan(start, startingTotal) {

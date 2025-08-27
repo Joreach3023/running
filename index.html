@@ -1862,6 +1862,8 @@ function generateCustomPlan() {
     // Créer le plan
     const plan = [];
     const progressPerWeek = (targetPaceSec - currentPaceSec) / weeksDiff;
+    // Alterner intervalles et tempos pour assurer leur présence
+    let nextQualityIsInterval = true;
     
     // Générer les semaines d'entraînement
     for (let week = 1; week <= weeksDiff; week++) {
@@ -1892,8 +1894,9 @@ function generateCustomPlan() {
                 sessionPaceSec = weekTargetPaceSec + 60; // +1 min/km
             } else if (day === 'tuesday' || day === 'wednesday' || day === 'thursday') {
                 // Jour de semaine - séance de qualité
-                type = Math.random() > 0.5 ? 'interval' : 'tempo';
-                
+                type = nextQualityIsInterval ? 'interval' : 'tempo';
+                nextQualityIsInterval = !nextQualityIsInterval;
+
                 if (type === 'interval') {
                     sessionDistance = 6 + (week * 0.2); // Augmente légèrement chaque semaine
                     sessionPaceSec = weekTargetPaceSec - (15 * (week / weeksDiff)); // Plus rapide que la cible
@@ -1915,15 +1918,14 @@ function generateCustomPlan() {
             }
             
             // Ajuster pour la distance cible
-            if (distance === 5) {
-                // Pour un plan 5 km, démarre plus court et augmente jusqu'à 5 km
-                const startDist = 2; // distance de départ
-                let maxForWeek = 5;
-                if (weeksDiff > 1) {
-                    const weeklyProgress = (5 - startDist) / (weeksDiff - 1);
-                    maxForWeek = startDist + weeklyProgress * (week - 1);
-                }
-                sessionDistance = Math.min(sessionDistance, maxForWeek);
+            if (distance === 5 && week !== weeksDiff) {
+                // Plan 5 km : progression douce à partir de 2 km
+                const startDist = 2;
+                const finalDist = 5;
+                const weeksProgress = Math.max(weeksDiff - 1, 1);
+                const maxForWeek = startDist + ((finalDist - startDist) / weeksProgress) * (week - 1);
+                const ratio = maxForWeek / finalDist;
+                sessionDistance = runTypes[type].distance * ratio;
             } else if (distance === 21.1) {
                 // Pour semi-marathon
                 if (type === 'long') {

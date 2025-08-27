@@ -2100,6 +2100,7 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
                     });
                 });
                 userData.trainingPlan = plan;
+                userData.eventDate = res.endDate.toISOString().split('T')[0];
                 updateTrainingPlanDisplay();
                 saveTrainingPlan();
                 return;
@@ -2320,7 +2321,9 @@ function renderTrainingCalendar() {
         cal.appendChild(head);
     });
     const start = new Date(userData.trainingPlan[0].date);
-    const end = new Date(userData.eventDate);
+    const end = userData.eventDate
+        ? new Date(userData.eventDate)
+        : new Date(userData.trainingPlan[userData.trainingPlan.length - 1].date);
     const offset = (start.getDay() + 6) % 7;
     for (let i = 0; i < offset; i++) {
         const empty = document.createElement('div');

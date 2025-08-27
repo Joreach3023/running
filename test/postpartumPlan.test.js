@@ -44,6 +44,7 @@ describe('postpartum plan generator', () => {
     const w3 = plan.weeks[2].totalRunMinutes;
     const w4 = plan.weeks[3].totalRunMinutes;
     expect(w4).to.be.closeTo(Math.round(w3 * 0.85), 0.1);
+    expect(plan.endDate.getTime()).to.equal(plan.weeks[3].sessions[1].date.getTime());
   });
 
   it('10 weeks without medical clearance -> walk + pelvic plan', () => {

@@ -2085,14 +2085,16 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
                 res.weeks.forEach(week => {
                     week.sessions.forEach(s => {
                         const date = s.date;
+                        const isRun = s.type !== 'walk' && s.type !== 'pelvic';
                         plan.push({
                             date: date.toISOString().split('T')[0],
                             day: date.toLocaleDateString('fr-FR', { weekday: 'long' }).toLowerCase(),
-                            type: s.type === 'run' ? 'easy' : s.type,
-                            typeName: s.type === 'run' ? 'Course' : s.type === 'walk' ? 'Marche' : 'Renforcement',
+                            type: isRun ? 'easy' : s.type,
+                            typeName: isRun ? 'Course' : s.type === 'walk' ? 'Marche' : 'Renforcement',
                             minutes: s.minutes,
+                            distance: s.distanceKm,
                             rpe: s.rpe || null,
-                            ppType: s.type,
+                            ppType: isRun ? 'run' : s.type,
                             completed: false
                         });
                     });
@@ -2182,12 +2184,16 @@ document.getElementById('plan-event-date').min = new Date(new Date().getTime() +
         const date = new Date(session.date);
         const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
-        const thirdCol = userData.runHabit === 'postpartum'
+        const thirdCol = session.minutes !== undefined
             ? `${session.minutes} min`
-            : `${session.distance} km`;
-        const fourthCol = userData.runHabit === 'postpartum'
-            ? (session.rpe ? `RPE ${session.rpe}` : '')
-            : `${session.pace} min/km`;
+            : session.distance !== undefined
+                ? `${session.distance} km`
+                : '';
+        const fourthCol = session.rpe !== undefined
+            ? `RPE ${session.rpe}`
+            : session.pace !== undefined
+                ? `${session.pace} min/km`
+                : '';
 
         tr.innerHTML = `
             <td>${formattedDate} (${session.day.charAt(0).toUpperCase() + session.day.slice(1)})</td>

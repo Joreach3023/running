@@ -17,5 +17,6 @@
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.25",
     "@capacitor/haptics": "^7.0.2"
+    "apn": "^2.2.0"
   }
 }

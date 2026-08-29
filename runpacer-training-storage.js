@@ -1,11 +1,13 @@
 // RunPacer training-plan bridge: legacy localStorage <-> native SwiftData.
-// The existing web UI can keep using `runPacerTrainingPlan` during the transition.
+// SwiftData is authoritative for reads; localStorage remains a temporary
+// write-through/compatibility surface for the existing web UI.
 
 (function (global) {
   'use strict';
 
   const PLAN_KEY = 'runPacerTrainingPlan';
   const USER_DATA_KEY = 'runPacerUserData';
+  const COMPATIBILITY_DEPTH_KEY = '__runPacerSwiftDataCompatibilityWriteDepth';
 
   let planTimer = null;
   let planSyncInFlight = Promise.resolve();
@@ -30,6 +32,10 @@
     } catch (_) {
       return fallback;
     }
+  }
+
+  function compatibilityWriteInProgress() {
+    return Number(global[COMPATIBILITY_DEPTH_KEY] || 0) > 0;
   }
 
   function readLegacyPlan() {
@@ -144,7 +150,11 @@
     const previousSetItem = global.Storage.prototype.setItem;
     global.Storage.prototype.setItem = function (key, value) {
       const result = previousSetItem.apply(this, arguments);
-      if (this === global.localStorage && (key === PLAN_KEY || key === USER_DATA_KEY)) {
+      if (
+        this === global.localStorage &&
+        (key === PLAN_KEY || key === USER_DATA_KEY) &&
+        !compatibilityWriteInProgress()
+      ) {
         queuePlanSync();
       }
       return result;

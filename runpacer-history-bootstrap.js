@@ -2,7 +2,8 @@
 //
 // Transitional strategy:
 // - SwiftData is the authoritative ordered list of personal runs.
-// - The SwiftData snapshot keeps the legacy detailed payload (GPS, splits, route image, pace, etc.).
+// - Each SwiftData run owns its complete detailed payload (GPS, splits, route image, pace, etc.).
+// - The global SwiftData snapshot remains a temporary fallback for older records.
 // - The existing web UI still reads userData.runs, so hydrate that array from RunPacerStorage.loadHistory().
 // - localStorage remains a temporary fallback/mirror while the existing UI is migrated incrementally.
 
@@ -85,6 +86,8 @@
         hydrated: true,
         source: result.source,
         runs: result.runs.length,
+        perRunPayloadMatches: result.perRunPayloadMatches || 0,
+        snapshotFallbackMatches: result.snapshotFallbackMatches || 0,
         detailedMatches: result.detailedMatches || 0,
         detailedCount: result.detailedCount || 0
       };

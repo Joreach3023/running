@@ -52,9 +52,29 @@ final class RunPacerStoredRun {
     }
 }
 
+/// Dedicated personal training-plan record. The plan remains JSON for now so
+/// the existing web plan format can evolve without forcing a rigid schema.
+@available(iOS 17.0, *)
+@Model
+final class RunPacerStoredTrainingPlan {
+    var planKey: String = "current-plan"
+    var payloadJSON: String = "[]"
+    var updatedAt: Date = Date()
+
+    init(
+        planKey: String = "current-plan",
+        payloadJSON: String = "[]",
+        updatedAt: Date = Date()
+    ) {
+        self.planKey = planKey
+        self.payloadJSON = payloadJSON
+        self.updatedAt = updatedAt
+    }
+}
+
 /// Flexible snapshot used for the existing Supabase `user_backups` payloads.
-/// It remains as a migration/fallback safety net while per-run payloads become
-/// the primary detailed storage representation.
+/// It remains as a migration/fallback safety net while dedicated SwiftData
+/// records become the primary representation.
 @available(iOS 17.0, *)
 @Model
 final class RunPacerUserSnapshot {
@@ -95,6 +115,7 @@ final class RunPacerDataStore {
 
         let schema = Schema([
             RunPacerStoredRun.self,
+            RunPacerStoredTrainingPlan.self,
             RunPacerUserSnapshot.self
         ])
 
@@ -112,8 +133,7 @@ final class RunPacerDataStore {
             container = try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             // Do not crash the whole running app if the persistent store cannot
-            // initialize. The bridge reports this fallback so it can be surfaced
-            // during testing instead of silently losing data.
+            // initialize. The bridge reports this fallback during testing.
             persistenceFallbackReason = error.localizedDescription
             let fallback = ModelConfiguration(
                 "RunPacerPersonalFallback",
@@ -154,9 +174,6 @@ final class RunPacerDataStore {
             existing.source = source
             existing.notes = notes
             existing.createdAt = createdAt
-
-            // An old/simplified caller must never erase details that were
-            // already migrated into the per-run payload.
             if let payloadJSON {
                 existing.payloadJSON = payloadJSON
             }
@@ -204,6 +221,34 @@ final class RunPacerDataStore {
         context.delete(run)
         try context.save()
         return true
+    }
+
+    func saveTrainingPlan(payloadJSON: String) throws {
+        let context = container.mainContext
+        let key = "current-plan"
+        let descriptor = FetchDescriptor<RunPacerStoredTrainingPlan>(
+            predicate: #Predicate { $0.planKey == key }
+        )
+
+        let record: RunPacerStoredTrainingPlan
+        if let existing = try context.fetch(descriptor).first {
+            record = existing
+        } else {
+            record = RunPacerStoredTrainingPlan(planKey: key)
+            context.insert(record)
+        }
+
+        record.payloadJSON = payloadJSON
+        record.updatedAt = Date()
+        try context.save()
+    }
+
+    func loadTrainingPlan() throws -> RunPacerStoredTrainingPlan? {
+        let key = "current-plan"
+        let descriptor = FetchDescriptor<RunPacerStoredTrainingPlan>(
+            predicate: #Predicate { $0.planKey == key }
+        )
+        return try container.mainContext.fetch(descriptor).first
     }
 
     func saveSnapshot(
@@ -254,6 +299,8 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "listRuns", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "loadRunPayload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "deleteRun", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveTrainingPlan", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "loadTrainingPlan", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveSnapshot", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "loadSnapshot", returnType: CAPPluginReturnPromise)
     ]
@@ -266,9 +313,6 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
     }()
 
     private func parseISODate(_ value: String) -> Date? {
-        // RunPacer's historical `startTime` values include milliseconds, e.g.
-        // 2026-06-06T12:01:09.093Z. ISO8601DateFormatter's default options do
-        // not reliably parse fractional seconds, so try that format first.
         if let parsed = isoFormatterWithFractionalSeconds.date(from: value) {
             return parsed
         }
@@ -396,6 +440,40 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc public func saveTrainingPlan(_ call: CAPPluginCall) {
+        guard let payloadJSON = call.getString("payloadJson") else {
+            call.reject("payloadJson is required")
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                try RunPacerDataStore.shared.saveTrainingPlan(payloadJSON: payloadJSON)
+                call.resolve(["saved": true])
+            } catch {
+                call.reject("Unable to save training plan", nil, error)
+            }
+        }
+    }
+
+    @objc public func loadTrainingPlan(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            do {
+                guard let plan = try RunPacerDataStore.shared.loadTrainingPlan() else {
+                    call.resolve(["exists": false])
+                    return
+                }
+                call.resolve([
+                    "exists": true,
+                    "payloadJson": plan.payloadJSON,
+                    "updatedAt": isoFormatter.string(from: plan.updatedAt)
+                ])
+            } catch {
+                call.reject("Unable to load training plan", nil, error)
+            }
+        }
+    }
+
     @objc public func saveSnapshot(_ call: CAPPluginCall) {
         let userDataJSON = call.getString("userDataJson")
         let trainingPlanJSON = call.getString("trainingPlanJson")
@@ -438,7 +516,7 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
 
 /// Capacitor 7 requires local plugins to be registered on the bridge view
 /// controller. Keeping this class in AppDelegate.swift means no Xcode project
-/// file references need to be added for the first migration step.
+/// file references need to be added for the migration steps.
 @objc(RunPacerBridgeViewController)
 class RunPacerBridgeViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {

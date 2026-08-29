@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RunPacer — Onboarding</title>
+<style>
+  /* ── Variables & Reset ─────────────────────── */
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --blue: #3b82f6;
+    --blue-glow: rgba(59,130,246,0.45);
+    --orange: #f97316;
+    --orange-glow: rgba(249,115,22,0.35);
+    --bg: #080d18;
+    --surface: rgba(255,255,255,0.05);
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.45);
+  }
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  /* ── Canvas étoiles background ─────────────── */
+  #stars-canvas {
+    position: fixed; inset: 0;
+    z-index: 0; pointer-events: none;
+  }
+
+  /* ── Conteneur principal scroll ─────────────── */
+  #scroll-container {
+    position: fixed; inset: 0;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    z-index: 1;
+  }
+  /* cache la scrollbar */
+  #scroll-container::-webkit-scrollbar { display: none; }
+  #scroll-container { scrollbar-width: none; }
+
+  /* ── Section générique ─────────────────────── */
+  .section {
+    position: relative;
+    width: 100%; height: 100dvh;
+    scroll-snap-align: start;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 28px;
+    overflow: hidden;
+  }
+
+  /* ═══════════════════════════════════════════════
+     SECTION 1 — Hero + soulier 3D
+  ═══════════════════════════════════════════════ */
+  #sec-hero {
+    background: radial-gradient(ellipse 90% 70% at 50% 110%, rgba(59,130,246,0.18) 0%, transparent 65%);
+  }
+
+  /* Logo RunPacer */
+  .hero-logo {
+    font-size: 13px; font-weight: 700; letter-spacing: 3px;
+    color: var(--blue); text-transform: uppercase;
+    margin-bottom: 32px;
+    opacity: 0; animation: fadeUp 0.7s 0.2s ease forwards;
+  }
+
+  /* ── Soulier CSS 3D ─────────────────────────── */
+  .shoe-stage {
+    width: 260px; height: 180px;
+    perspective: 800px;
+    margin-bottom: 36px;
+    position: relative;
+    opacity: 0; animation: fadeUp 0.8s 0.4s ease forwards;
+  }
+  .shoe-3d {
+    width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transform: rotateX(8deg) rotateY(-25deg);
+    transition: transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+  }
+
+  /* Corps principal du soulier */
+  .shoe-body {
+    position: absolute;
+    bottom: 20px; left: 10px;
+    width: 240px; height: 100px;
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 40%, #3b82f6 100%);
+    border-radius: 60px 80px 20px 20px;
+    box-shadow:
+      0 0 40px var(--blue-glow),
+      inset 0 2px 0 rgba(255,255,255,0.15),
+      0 8px 32px rgba(0,0,0,0.6);
+    transform-style: preserve-3d;
+  }
+
+  /* Semelle */
+  .shoe-sole {
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 250px; height: 28px;
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 0 0 30px 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+    transform: translateZ(-8px) translateY(18px);
+  }
+  /* Rainures semelle */
+  .shoe-sole::after {
+    content:'';
+    position:absolute; bottom: 4px; left: 16px; right: 16px; height: 3px;
+    background: repeating-linear-gradient(90deg,
+      rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 8px,
+      transparent 8px, transparent 14px);
+    border-radius: 2px;
+  }
+
+  /* Partie haute / tige */
+  .shoe-upper {
+    position: absolute;
+    top: 0; left: 40px;
+    width: 160px; height: 80px;
+    background: linear-gradient(135deg, #2563eb 0%, #60a5fa 100%);
+    border-radius: 40px 60px 10px 20px;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.2);
+    transform: translateZ(6px);
+  }
+
+  /* Languette */
+  .shoe-tongue {
+    position: absolute;
+    top: -10px; left: 80px;
+    width: 55px; height: 45px;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    border-radius: 10px 10px 4px 4px;
+    box-shadow: 0 -4px 12px rgba(59,130,246,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+    transform: translateZ(10px);
+  }
+
+  /* Lacets */
+  .shoe-laces {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    transform: translateZ(11px);
+  }
+  .lace {
+    position: absolute;
+    left: 90px;
+    height: 2px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 1px;
+    transform-origin: left center;
+  }
+  .lace:nth-child(1) { top: 6px;  width: 34px; transform: rotate(-2deg); }
+  .lace:nth-child(2) { top: 14px; width: 30px; transform: rotate(2deg); }
+  .lace:nth-child(3) { top: 22px; width: 34px; transform: rotate(-1deg); }
+  .lace:nth-child(4) { top: 30px; width: 28px; transform: rotate(1.5deg); }
+
+  /* Swoosh / logo décoratif */
+  .shoe-swoosh {
+    position: absolute;
+    bottom: 30px; left: 20px;
+    width: 100px; height: 30px;
+    border-bottom: 3px solid rgba(255,255,255,0.25);
+    border-radius: 0 0 80px 0;
+    transform: translateZ(7px) rotate(-6deg);
+  }
+
+  /* Lumière ambiante sous le soulier */
+  .shoe-glow {
+    position: absolute;
+    bottom: -12px; left: 50%;
+    transform: translateX(-50%);
+    width: 200px; height: 30px;
+    background: radial-gradient(ellipse, var(--blue-glow), transparent 70%);
+    filter: blur(8px);
+    animation: glowPulse 2.5s ease-in-out infinite;
+  }
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.6; transform: translateX(-50%) scaleX(1); }
+    50%       { opacity: 1;   transform: translateX(-50%) scaleX(1.15); }
+  }
+
+  /* ── Texte hero ─────────────────────────────── */
+  .hero-headline {
+    font-size: clamp(2rem, 8vw, 3rem);
+    font-weight: 800; letter-spacing: -1px;
+    text-align: center; line-height: 1.1;
+    opacity: 0; animation: fadeUp 0.8s 0.6s ease forwards;
+  }
+  .hero-headline span { color: var(--blue); }
+
+  .hero-sub {
+    font-size: 15px; color: var(--muted); text-align: center;
+    margin-top: 12px; line-height: 1.6;
+    max-width: 300px;
+    opacity: 0; animation: fadeUp 0.8s 0.8s ease forwards;
+  }
+
+  /* ── Indicateur scroll ──────────────────────── */
+  .scroll-hint {
+    position: absolute; bottom: 40px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    opacity: 0; animation: fadeUp 0.8s 1.2s ease forwards;
+  }
+  .scroll-hint span {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .scroll-dot {
+    width: 6px; height: 20px;
+    border: 1.5px solid var(--blue);
+    border-radius: 3px;
+    position: relative; overflow: hidden;
+  }
+  .scroll-dot::after {
+    content: '';
+    position: absolute; top: 2px; left: 50%; transform: translateX(-50%);
+    width: 2px; height: 4px;
+    background: var(--blue); border-radius: 1px;
+    animation: scrollBounce 1.5s ease-in-out infinite;
+  }
+  @keyframes scrollBounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+    80%       { transform: translateX(-50%) translateY(10px); opacity: 0; }
+  }
+
+  /* ═══════════════════════════════════════════════
+     SECTION 2 — Features révélées par le scroll
+  ═══════════════════════════════════════════════ */
+  #sec-features {
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59,130,246,0.12) 0%, transparent 60%);
+    gap: 0;
+    padding-top: 60px;
+  }
+
+  .features-title {
+    font-size: 22px; font-weight: 800; text-align: center;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.6) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .features-sub {
+    font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 32px;
+  }
+
+  .feature-cards {
+    display: flex; flex-direction: column; gap: 14px;
+    width: 100%; max-width: 380px;
+  }
+  .feature-card {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px; padding: 18px 20px;
+    backdrop-filter: blur(10px);
+    opacity: 0; transform: translateX(-30px);
+    transition: opacity 0.5s ease, transform 0.5s ease, box-shadow 0.3s ease;
+  }
+  .feature-card.visible {
+    opacity: 1; transform: translateX(0);
+  }
+  .feature-card:hover {
+    box-shadow: 0 0 0 1px rgba(59,130,246,0.3), 0 8px 30px rgba(59,130,246,0.1);
+  }
+  .feature-card:nth-child(1) { transition-delay: 0s; }
+  .feature-card:nth-child(2) { transition-delay: 0.1s; }
+  .feature-card:nth-child(3) { transition-delay: 0.2s; }
+  .feature-card:nth-child(4) { transition-delay: 0.3s; }
+
+  .feature-icon {
+    width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .feature-icon.blue   { background: rgba(59,130,246,0.18); }
+  .feature-icon.orange { background: rgba(249,115,22,0.18); }
+  .feature-icon.green  { background: rgba(34,197,94,0.18); }
+  .feature-icon.purple { background: rgba(139,92,246,0.18); }
+
+  .feature-text h3 { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+  .feature-text p  { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  /* ═══════════════════════════════════════════════
+     SECTION 3 — Stats / Social Proof
+  ═══════════════════════════════════════════════ */
+  #sec-stats {
+    background: radial-gradient(ellipse 100% 80% at 50% 50%, rgba(249,115,22,0.08) 0%, transparent 60%);
+    gap: 40px;
+  }
+
+  .stats-eyebrow {
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--orange); font-weight: 700; text-align: center;
+  }
+  .stats-headline {
+    font-size: clamp(1.8rem, 7vw, 2.5rem); font-weight: 800;
+    text-align: center; line-height: 1.15;
+  }
+  .stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 14px; width: 100%; max-width: 340px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; padding: 20px 16px; text-align: center;
+    opacity: 0; transform: scale(0.85);
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .stat-card.visible { opacity: 1; transform: scale(1); }
+  .stat-card:nth-child(1) { transition-delay: 0s; }
+  .stat-card:nth-child(2) { transition-delay: 0.1s; }
+  .stat-card:nth-child(3) { transition-delay: 0.2s; }
+  .stat-card:nth-child(4) { transition-delay: 0.3s; }
+
+  .stat-num {
+    font-size: 28px; font-weight: 800; line-height: 1;
+    background: linear-gradient(135deg, var(--orange), #fbbf24);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); line-height: 1.3; }
+
+  /* ═══════════════════════════════════════════════
+     SECTION 4 — Soulier animé + points clés (scroll révèle)
+  ═══════════════════════════════════════════════ */
+  #sec-shoe-reveal {
+    background: radial-gradient(ellipse 80% 70% at 50% 100%, rgba(59,130,246,0.15) 0%, transparent 60%);
+    flex-direction: column; gap: 0; overflow: hidden;
+  }
+
+  .shoe-reveal-title {
+    font-size: 20px; font-weight: 800; text-align: center;
+    margin-bottom: 4px;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .shoe-reveal-title.visible { opacity: 1; transform: translateY(0); }
+  .shoe-reveal-sub {
+    font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 20px;
+    opacity: 0; transition: opacity 0.6s 0.15s ease;
+  }
+  .shoe-reveal-sub.visible { opacity: 1; }
+
+  /* Grand soulier central avec points hotspot */
+  .shoe-hotspot-wrap {
+    position: relative; width: 300px; height: 200px;
+    margin: 0 auto 20px;
+    opacity: 0; transform: translateY(30px);
+    transition: opacity 0.7s 0.1s ease, transform 0.7s 0.1s ease;
+  }
+  .shoe-hotspot-wrap.visible { opacity: 1; transform: translateY(0); }
+
+  /* Soulier grand format */
+  .shoe-big {
+    position: absolute;
+    bottom: 10px; left: 0; right: 0;
+    width: 300px; height: 130px;
+    transform-style: preserve-3d;
+    animation: shoeFloat 4s ease-in-out infinite;
+  }
+  @keyframes shoeFloat {
+    0%, 100% { transform: translateY(0) rotateY(-20deg); }
+    50%       { transform: translateY(-8px) rotateY(-15deg); }
+  }
+
+  .shoe-big .shoe-body {
+    width: 290px; height: 110px;
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 40%, #60a5fa 100%);
+    box-shadow: 0 0 60px rgba(59,130,246,0.5), 0 12px 40px rgba(0,0,0,0.7);
+  }
+  .shoe-big .shoe-upper { width: 180px; height: 90px; }
+  .shoe-big .shoe-tongue { left: 95px; width: 60px; height: 50px; }
+
+  /* Points interactifs */
+  .hotspot {
+    position: absolute;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(59,130,246,0.2);
+    border: 2px solid var(--blue);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+    animation: hotspotPulse 2s ease-in-out infinite;
+    z-index: 10;
+  }
+  .hotspot::after {
+    content: '+'; font-size: 16px; color: var(--blue); font-weight: 700;
+  }
+  .hotspot:active { transform: scale(0.9); background: rgba(59,130,246,0.4); }
+  @keyframes hotspotPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+    50%       { box-shadow: 0 0 0 8px rgba(59,130,246,0); }
+  }
+  .hotspot-1 { top: 10px; left: 110px; animation-delay: 0s; }
+  .hotspot-2 { top: 40px; right: 30px; animation-delay: 0.5s; }
+  .hotspot-3 { bottom: 40px; left: 40px; animation-delay: 1s; }
+
+  /* Tooltip des hotspots */
+  .hotspot-tooltip {
+    position: absolute;
+    background: rgba(15,23,42,0.95);
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 12px; padding: 10px 14px;
+    font-size: 12px; color: #fff;
+    width: 150px; pointer-events: none;
+    opacity: 0; transform: scale(0.8);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 20; backdrop-filter: blur(10px);
+  }
+  .hotspot-tooltip.show { opacity: 1; transform: scale(1); }
+  .hotspot-tooltip strong { display: block; font-size: 13px; margin-bottom: 2px; color: var(--blue); }
+  .tt-1 { top: -70px; left: 80px; }
+  .tt-2 { top: 0px;  right: 60px; }
+  .tt-3 { bottom: 10px; left: 60px; }
+
+  /* Points feature sous le soulier */
+  .shoe-features-list {
+    display: flex; flex-direction: column; gap: 10px;
+    width: 100%; max-width: 360px;
+  }
+  .shoe-feat {
+    display: flex; align-items: center; gap: 12px;
+    opacity: 0; transform: translateX(-20px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .shoe-feat.visible { opacity: 1; transform: translateX(0); }
+  .shoe-feat:nth-child(1) { transition-delay: 0.3s; }
+  .shoe-feat:nth-child(2) { transition-delay: 0.45s; }
+  .shoe-feat:nth-child(3) { transition-delay: 0.6s; }
+  .shoe-feat-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: var(--blue);
+    box-shadow: 0 0 8px var(--blue-glow);
+  }
+  .shoe-feat-dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange-glow); }
+  .shoe-feat-dot.green  { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.4); }
+  .shoe-feat p { font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.4; }
+  .shoe-feat p strong { color: #fff; }
+
+  /* ═══════════════════════════════════════════════
+     SECTION 5 — CTA final
+  ═══════════════════════════════════════════════ */
+  #sec-cta {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(59,130,246,0.2) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 20% 20%, rgba(139,92,246,0.1) 0%, transparent 50%);
+    gap: 0;
+  }
+
+  .cta-badge {
+    background: rgba(249,115,22,0.15);
+    border: 1px solid rgba(249,115,22,0.35);
+    border-radius: 20px; padding: 6px 16px;
+    font-size: 12px; font-weight: 700; color: var(--orange);
+    letter-spacing: 0.5px; margin-bottom: 24px;
+    opacity: 0; transition: opacity 0.6s ease;
+  }
+  .cta-badge.visible { opacity: 1; }
+
+  .cta-headline {
+    font-size: clamp(2rem, 9vw, 3.2rem); font-weight: 800;
+    text-align: center; line-height: 1.1; letter-spacing: -1px;
+    margin-bottom: 12px;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.6s 0.1s ease, transform 0.6s 0.1s ease;
+  }
+  .cta-headline.visible { opacity: 1; transform: translateY(0); }
+
+  .cta-sub {
+    font-size: 15px; color: var(--muted); text-align: center;
+    max-width: 280px; line-height: 1.6; margin-bottom: 40px;
+    opacity: 0; transition: opacity 0.6s 0.2s ease;
+  }
+  .cta-sub.visible { opacity: 1; }
+
+  .cta-buttons {
+    display: flex; flex-direction: column; gap: 12px;
+    width: 100%; max-width: 340px;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.6s 0.3s ease, transform 0.6s 0.3s ease;
+  }
+  .cta-buttons.visible { opacity: 1; transform: translateY(0); }
+
+  .btn-strava {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 17px; border-radius: 16px; border: none;
+    background: linear-gradient(135deg, #fc4c02 0%, #e84118 100%);
+    color: #fff; font-size: 16px; font-weight: 700;
+    cursor: pointer; letter-spacing: 0.2px;
+    box-shadow: 0 8px 30px rgba(252,76,2,0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-strava:active { transform: scale(0.97); box-shadow: 0 4px 15px rgba(252,76,2,0.3); }
+
+  .btn-email {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 17px; border-radius: 16px;
+    border: 1.5px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.06);
+    color: #fff; font-size: 15px; font-weight: 600;
+    cursor: pointer; backdrop-filter: blur(10px);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .btn-email:active { transform: scale(0.97); background: rgba(255,255,255,0.1); }
+
+  .btn-guest {
+    background: none; border: none;
+    color: var(--muted); font-size: 13px; cursor: pointer;
+    padding: 8px; text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* ── Barre de progression sections ─────────── */
+  #progress-bar {
+    position: fixed; right: 16px; top: 50%;
+    transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 8px;
+    z-index: 100;
+  }
+  .pb-dot {
+    width: 5px; height: 5px; border-radius: 3px;
+    background: rgba(255,255,255,0.2);
+    transition: background 0.3s ease, height 0.3s ease;
+  }
+  .pb-dot.active {
+    background: var(--blue);
+    height: 18px;
+  }
+
+  /* ── Animations globales ────────────────────── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Lignes de grille déco */
+  .grid-lines {
+    position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+    opacity: 0.04;
+  }
+  .grid-lines::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
+  }
+
+  /* Orbes lumineux déco */
+  .orb {
+    position: absolute; border-radius: 50%;
+    filter: blur(60px); pointer-events: none; opacity: 0.15;
+  }
+  .orb-blue  { background: #3b82f6; }
+  .orb-purple { background: #8b5cf6; }
+  .orb-orange { background: #f97316; }
+</style>
+</head>
+<body>
+
+<!-- Canvas étoiles -->
+<canvas id="stars-canvas"></canvas>
+
+<!-- Barre de progression -->
+<div id="progress-bar">
+  <div class="pb-dot active"></div>
+  <div class="pb-dot"></div>
+  <div class="pb-dot"></div>
+  <div class="pb-dot"></div>
+  <div class="pb-dot"></div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SCROLL CONTAINER
+════════════════════════════════════════ -->
+<div id="scroll-container">
+
+  <!-- ── SECTION 1 : HERO ─────────────────── -->
+  <section class="section" id="sec-hero">
+    <div class="grid-lines"></div>
+    <div class="orb orb-blue" style="width:300px;height:300px;top:-100px;left:-80px;"></div>
+    <div class="orb orb-purple" style="width:200px;height:200px;bottom:0;right:-60px;"></div>
+
+    <div class="hero-logo">RunPacer</div>
+
+    <!-- Soulier 3D CSS -->
+    <div class="shoe-stage">
+      <div class="shoe-3d" id="shoe-hero">
+        <div class="shoe-body">
+          <div class="shoe-upper"></div>
+          <div class="shoe-tongue"></div>
+          <div class="shoe-laces">
+            <div class="lace"></div>
+            <div class="lace"></div>
+            <div class="lace"></div>
+            <div class="lace"></div>
+          </div>
+          <div class="shoe-swoosh"></div>
+        </div>
+        <div class="shoe-sole"></div>
+      </div>
+      <div class="shoe-glow"></div>
+    </div>
+
+    <h1 class="hero-headline">
+      Dépasse-toi.<br><span>Chaque kilomètre</span><br>compte.
+    </h1>
+    <p class="hero-sub">
+      Ton programme d'entraînement personnalisé, conçu pour te pousser plus loin à chaque sortie.
+    </p>
+
+    <div class="scroll-hint">
+      <span>Découvrir</span>
+      <div class="scroll-dot"></div>
+    </div>
+  </section>
+
+  <!-- ── SECTION 2 : FEATURES ─────────────── -->
+  <section class="section" id="sec-features">
+    <div class="orb orb-blue" style="width:250px;height:250px;top:-60px;right:-80px;opacity:0.12;"></div>
+
+    <p class="features-title">Tout ce dont tu as besoin</p>
+    <p class="features-sub">pour progresser vraiment</p>
+
+    <div class="feature-cards">
+      <div class="feature-card">
+        <div class="feature-icon blue">🎯</div>
+        <div class="feature-text">
+          <h3>Programme sur mesure</h3>
+          <p>Adapté à ton niveau, ton objectif et ta disponibilité.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon orange">⚡</div>
+        <div class="feature-text">
+          <h3>Sessions intelligentes</h3>
+          <p>Fractionné, endurance, récupération — tout est planifié.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon green">📈</div>
+        <div class="feature-text">
+          <h3>Progression visible</h3>
+          <p>Ton évolution semaine après semaine, en un coup d'œil.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon purple">🏆</div>
+        <div class="feature-text">
+          <h3>Boss Runs & XP</h3>
+          <p>Des défis hebdomadaires pour te surpasser et gagner des points.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SECTION 3 : STATS ─────────────────── -->
+  <section class="section" id="sec-stats">
+    <div class="orb orb-orange" style="width:280px;height:280px;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.08;"></div>
+
+    <p class="stats-eyebrow">Résultats prouvés</p>
+    <h2 class="stats-headline">Des coureurs<br>qui progressent</h2>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-num">3×</div>
+        <div class="stat-label">plus réguliers en 4 semaines</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">-8%</div>
+        <div class="stat-label">sur leur allure au 5km</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">12min</div>
+        <div class="stat-label">de planification<br>par semaine</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">94%</div>
+        <div class="stat-label">terminent leur programme</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SECTION 4 : SOULIER + HOTSPOTS ───── -->
+  <section class="section" id="sec-shoe-reveal">
+    <div class="orb orb-blue" style="width:350px;height:350px;bottom:-100px;left:-100px;opacity:0.1;"></div>
+
+    <p class="shoe-reveal-title">Conçu pour la performance</p>
+    <p class="shoe-reveal-sub">Appuie sur le soulier pour découvrir</p>
+
+    <!-- Soulier grand avec hotspots -->
+    <div class="shoe-hotspot-wrap" id="shoe-hotspot-wrap">
+      <div class="shoe-big" id="shoe-big">
+        <div class="shoe-body">
+          <div class="shoe-upper"></div>
+          <div class="shoe-tongue"></div>
+          <div class="shoe-laces">
+            <div class="lace"></div>
+            <div class="lace"></div>
+            <div class="lace"></div>
+            <div class="lace"></div>
+          </div>
+          <div class="shoe-swoosh"></div>
+        </div>
+        <div class="shoe-sole"></div>
+      </div>
+      <div class="shoe-glow"></div>
+
+      <!-- Hotspots interactifs -->
+      <div class="hotspot hotspot-1" data-tip="tt-1"></div>
+      <div class="hotspot hotspot-2" data-tip="tt-2"></div>
+      <div class="hotspot hotspot-3" data-tip="tt-3"></div>
+
+      <!-- Tooltips -->
+      <div class="hotspot-tooltip tt-1" id="tt-1">
+        <strong>Programmes IA</strong>
+        Générés selon ton profil exact
+      </div>
+      <div class="hotspot-tooltip tt-2" id="tt-2">
+        <strong>Sessions variées</strong>
+        Fractionné, seuil, récupération
+      </div>
+      <div class="hotspot-tooltip tt-3" id="tt-3">
+        <strong>Semelles adaptées</strong>
+        Intensité ajustée chaque semaine
+      </div>
+    </div>
+
+    <!-- Features list -->
+    <div class="shoe-features-list">
+      <div class="shoe-feat">
+        <div class="shoe-feat-dot"></div>
+        <p><strong>Programmes adaptatifs</strong> — ajustés selon ta fatigue et tes performances.</p>
+      </div>
+      <div class="shoe-feat">
+        <div class="shoe-feat-dot orange"></div>
+        <p><strong>Allures précises</strong> — chaque session avec une cible claire.</p>
+      </div>
+      <div class="shoe-feat">
+        <div class="shoe-feat-dot green"></div>
+        <p><strong>Synchronisation Strava</strong> — tes runs importés automatiquement.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SECTION 5 : CTA ───────────────────── -->
+  <section class="section" id="sec-cta">
+    <div class="orb orb-blue" style="width:300px;height:300px;top:-80px;right:-80px;opacity:0.15;"></div>
+    <div class="orb orb-purple" style="width:250px;height:250px;bottom:-60px;left:-60px;opacity:0.1;"></div>
+
+    <div class="cta-badge">✦ Premium · Gratuit au démarrage</div>
+
+    <h2 class="cta-headline">Prêt à<br>aller plus loin ?</h2>
+
+    <p class="cta-sub">
+      Rejoins les coureurs qui ont décidé de se dépasser, une séance à la fois.
+    </p>
+
+    <div class="cta-buttons">
+      <button class="btn-strava" onclick="handleStrava()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+        </svg>
+        Continuer avec Strava
+      </button>
+      <button class="btn-email" onclick="handleEmail()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/>
+        </svg>
+        S'inscrire par e-mail
+      </button>
+      <button class="btn-guest" onclick="handleGuest()">Continuer sans compte →</button>
+    </div>
+  </section>
+
+</div><!-- /scroll-container -->
+
+<script>
+/* ══════════════════════════════════════════════════════
+   ÉTOILES CANVAS
+══════════════════════════════════════════════════════ */
+(function() {
+  const canvas = document.getElementById('stars-canvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  let W, H;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function initStars() {
+    stars = [];
+    for (let i = 0; i < 120; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 1.2 + 0.2,
+        a: Math.random(),
+        speed: Math.random() * 0.004 + 0.001,
+        offset: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  function drawStars(t) {
+    ctx.clearRect(0, 0, W, H);
+    stars.forEach(s => {
+      const alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * s.speed + s.offset));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(drawStars);
+  }
+
+  resize();
+  initStars();
+  requestAnimationFrame(drawStars);
+  window.addEventListener('resize', () => { resize(); initStars(); });
+})();
+
+/* ══════════════════════════════════════════════════════
+   SCROLL — parallax soulier héro
+══════════════════════════════════════════════════════ */
+const scrollContainer = document.getElementById('scroll-container');
+const shoeHero = document.getElementById('shoe-hero');
+
+// Rotation du soulier héro au scroll
+scrollContainer.addEventListener('scroll', () => {
+  const scrollTop = scrollContainer.scrollTop;
+  const viewH = window.innerHeight;
+  const progress = scrollTop / viewH; // 0 → 1 sur la 1ère section
+
+  // Rotation progressive du soulier
+  const rotY = -25 + progress * 60;
+  const rotX = 8 - progress * 5;
+  if (shoeHero) {
+    shoeHero.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+  }
+
+  // Progress bar
+  const sectionIndex = Math.round(scrollTop / viewH);
+  document.querySelectorAll('.pb-dot').forEach((dot, i) => {
+    dot.classList.toggle('active', i === sectionIndex);
+  });
+
+  // Déclenche les animations au scroll
+  checkVisibility();
+}, { passive: true });
+
+/* ══════════════════════════════════════════════════════
+   INTERSECTION OBSERVER — éléments scroll
+══════════════════════════════════════════════════════ */
+function checkVisibility() {
+  const animated = document.querySelectorAll(
+    '.feature-card, .stat-card, .shoe-reveal-title, .shoe-reveal-sub, ' +
+    '.shoe-hotspot-wrap, .shoe-feat, .cta-badge, .cta-headline, .cta-sub, .cta-buttons'
+  );
+  animated.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    const inView = rect.top < window.innerHeight * 0.88 && rect.bottom > 0;
+    if (inView) el.classList.add('visible');
+  });
+}
+
+// Observer natif pour les sections
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.querySelectorAll(
+        '.feature-card, .stat-card, .shoe-reveal-title, .shoe-reveal-sub, ' +
+        '.shoe-hotspot-wrap, .shoe-feat, .cta-badge, .cta-headline, .cta-sub, .cta-buttons'
+      ).forEach(el => {
+        setTimeout(() => el.classList.add('visible'), 50);
+      });
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.section').forEach(s => observer.observe(s));
+
+/* ══════════════════════════════════════════════════════
+   HOTSPOTS — toggle tooltip au tap
+══════════════════════════════════════════════════════ */
+document.querySelectorAll('.hotspot').forEach(hs => {
+  hs.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const tipId = this.getAttribute('data-tip');
+    const tip = document.getElementById(tipId);
+
+    // Ferme les autres
+    document.querySelectorAll('.hotspot-tooltip').forEach(t => {
+      if (t.id !== tipId) t.classList.remove('show');
+    });
+
+    tip.classList.toggle('show');
+  });
+});
+
+// Ferme les tooltips si on clique ailleurs
+document.addEventListener('click', () => {
+  document.querySelectorAll('.hotspot-tooltip').forEach(t => t.classList.remove('show'));
+});
+
+/* ══════════════════════════════════════════════════════
+   SOULIER HERO — gyroscope sur mobile
+══════════════════════════════════════════════════════ */
+if (window.DeviceOrientationEvent) {
+  window.addEventListener('deviceorientation', e => {
+    if (!shoeHero) return;
+    const beta  = Math.max(-20, Math.min(20, e.beta  || 0)) / 20;  // -1 à 1
+    const gamma = Math.max(-30, Math.min(30, e.gamma || 0)) / 30;  // -1 à 1
+    const scrollProgress = scrollContainer.scrollTop / window.innerHeight;
+    if (scrollProgress < 0.2) {
+      const rotX = 8 + beta * 8;
+      const rotY = -25 + gamma * 25;
+      shoeHero.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+    }
+  }, { passive: true });
+}
+
+/* ══════════════════════════════════════════════════════
+   CTA — actions (à connecter à ton app)
+══════════════════════════════════════════════════════ */
+function handleStrava() {
+  // Déclenche le flow Strava de l'app principale
+  if (window.RunpacerConnections) {
+    window.dispatchEvent(new CustomEvent('runpacer:strava-login'));
+  } else {
+    console.log('[RunPacer] Strava login');
+  }
+}
+
+function handleEmail() {
+  if (window.RunpacerConnections) {
+    window.dispatchEvent(new CustomEvent('runpacer:email-login'));
+  } else {
+    console.log('[RunPacer] Email login');
+  }
+}
+
+function handleGuest() {
+  if (window.RunpacerConnections) {
+    window.dispatchEvent(new CustomEvent('runpacer:guest-login'));
+  } else {
+    console.log('[RunPacer] Guest continue');
+  }
+}
+
+// Init check
+checkVisibility();
+</script>
+</body>
+</html>

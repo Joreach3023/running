@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>RunPacer — Plongée dans les nuages</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --primary:#3498db;
+  --secondary:#2ecc71;
+  --warning:#e74c3c;
+  --dark:#0b1220;
+  --muted:#7f8c8d;
+  --text:#1a2333;
+  --font-display:"Outfit",system-ui,sans-serif;
+  --font-sans:"Inter",system-ui,sans-serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#000;font-family:var(--font-sans);color:var(--text);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+.screen{position:fixed;inset:0;display:none;flex-direction:column;background:#f5f7fa}
+.screen.active{display:flex}
+
+/* ======= 1) DETAIL ======= */
+#detail-screen{background:linear-gradient(180deg,#eaf2ff 0%,#f5f7fa 40%);overflow-y:auto}
+.detail-header{padding:64px 24px 20px;display:flex;align-items:center;justify-content:space-between}
+.back-btn{width:40px;height:40px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--dark)}
+.session-type-badge{display:inline-block;padding:6px 14px;border-radius:999px;background:var(--primary);color:#fff;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.detail-title{padding:8px 24px 0;font-family:var(--font-display);font-weight:800;font-size:32px;line-height:1.1;color:var(--dark)}
+.detail-sub{padding:6px 24px 0;color:var(--muted);font-size:15px}
+.objective-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:20px 24px 4px}
+.obj-card{background:#fff;border-radius:16px;padding:14px 12px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.obj-card .val{font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--dark)}
+.obj-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.weather-card{margin:16px 24px 0;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,#ffb347,#ffcc33);color:#fff;display:flex;align-items:center;gap:14px;box-shadow:0 6px 20px rgba(255,179,71,.35)}
+.weather-card .icn{font-size:34px}
+.weather-card .main{flex:1}
+.weather-card .temp{font-family:var(--font-display);font-size:26px;font-weight:800;line-height:1}
+.weather-card .desc{font-size:13px;opacity:.95;margin-top:2px}
+.weather-card .extra{font-size:12px;opacity:.95;text-align:right}
+.advice-card{margin:16px 24px 0;padding:18px;border-radius:16px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.advice-card h3{font-family:var(--font-display);font-size:16px;margin-bottom:8px;color:var(--dark);display:flex;align-items:center;gap:8px}
+.advice-card p{font-size:14px;color:#374151;line-height:1.5}
+.advice-card .bullets{margin-top:10px}
+.advice-card .bullets li{font-size:13px;color:#374151;list-style:none;padding:6px 0 6px 22px;position:relative}
+.advice-card .bullets li::before{content:"";position:absolute;left:4px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--secondary)}
+.start-wrap{padding:20px 24px 120px}
+.start-btn{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);width:84%;max-width:360px;height:64px;border-radius:999px;background:linear-gradient(135deg,var(--primary),#1e6fb8);color:#fff;font-family:var(--font-display);font-weight:800;font-size:18px;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 14px 30px rgba(52,152,219,.45);display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .15s ease}
+.start-btn:active{transform:translateX(-50%) scale(.97)}
+.start-btn .arrow{font-size:22px}
+
+/* ======= 2) GLOBE + CLOUDS SCREEN ======= */
+#globe-screen{background:radial-gradient(ellipse at center,#0a1628 0%,#000 70%);align-items:center;justify-content:center}
+#globe-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+
+/* Couche de nuages 2D en overlay qui grossissent et deviennent opaques */
+.clouds-overlay{
+  position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;
+}
+.cloud-puff{
+  position:absolute;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.95), rgba(255,255,255,.55) 55%, rgba(255,255,255,0) 75%);
+  filter:blur(20px);
+  opacity:0;
+  will-change:transform,opacity;
+}
+
+/* Lueur bleue atmosphérique au moment du perçage */
+.atmo-glow{
+  position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(ellipse at center, rgba(120,200,255,.7) 0%, rgba(80,160,255,.35) 30%, rgba(0,60,120,0) 70%);
+  opacity:0;mix-blend-mode:screen;
+}
+
+/* White-out final */
+.whiteout{
+  position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:#ffffff;opacity:0;
+}
+
+/* Countdown par dessus tout */
+.globe-overlay{
+  position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;
+}
+.countdown-num{
+  font-family:var(--font-display);font-weight:800;font-size:180px;color:#fff;
+  text-shadow:0 0 40px rgba(52,152,219,.8), 0 0 100px rgba(255,255,255,.5);
+  opacity:0;transform:scale(.6);
+  animation:popCount 1s ease forwards;
+}
+@keyframes popCount{
+  0%{opacity:0;transform:scale(.4)}
+  20%{opacity:1;transform:scale(1.15)}
+  60%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.8)}
+}
+.go-text{
+  font-family:var(--font-display);font-weight:800;font-size:120px;
+  background:linear-gradient(135deg,#2ecc71,#1abc9c);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 60px rgba(46,204,113,.6);
+  opacity:0;transform:scale(.6);
+  animation:popGo 1.2s ease forwards;letter-spacing:.1em;
+}
+@keyframes popGo{
+  0%{opacity:0;transform:scale(.4)}
+  30%{opacity:1;transform:scale(1.2)}
+  60%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(2);filter:blur(6px)}
+}
+.globe-location{
+  position:absolute;top:72px;left:0;right:0;text-align:center;color:#fff;
+  font-family:var(--font-display);z-index:7;
+  transition:opacity .6s ease;
+}
+.globe-location .where{font-size:14px;letter-spacing:.2em;text-transform:uppercase;opacity:.75}
+.globe-location .name{font-size:22px;font-weight:700;margin-top:4px}
+
+/* Speed streaks pendant la plongée */
+.speed-streaks{
+  position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;
+  background:
+    repeating-radial-gradient(circle at center, rgba(255,255,255,0) 0, rgba(255,255,255,0) 40px, rgba(255,255,255,.15) 41px, rgba(255,255,255,0) 60px);
+}
+
+/* ======= 3) RUN SCREEN ======= */
+#run-screen{background:#000}
+#run-map{position:absolute;inset:0;z-index:1}
+.run-top{position:absolute;top:0;left:0;right:0;z-index:3;padding:56px 18px 18px;background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0));display:flex;justify-content:space-between;align-items:center;color:#fff}
+.run-top .session{font-family:var(--font-display);font-weight:700;font-size:16px}
+.run-top .locked{padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.15);font-size:12px;display:flex;align-items:center;gap:6px;backdrop-filter:blur(10px)}
+.run-stats{position:absolute;left:12px;right:12px;bottom:110px;z-index:3;background:rgba(15,23,42,.78);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:24px;padding:18px 16px 16px;color:#fff;box-shadow:0 16px 40px rgba(0,0,0,.35)}
+.main-stat{text-align:center;margin-bottom:10px}
+.main-stat .val{font-family:var(--font-display);font-weight:800;font-size:62px;line-height:1}
+.main-stat .lbl{font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.6;margin-top:4px}
+.sub-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.sub-stat{text-align:center;padding:10px 4px;border-radius:14px;background:rgba(255,255,255,.06)}
+.sub-stat .val{font-family:var(--font-display);font-weight:700;font-size:20px}
+.sub-stat .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-top:2px}
+.run-controls{position:absolute;bottom:24px;left:0;right:0;z-index:3;display:flex;justify-content:center;gap:22px}
+.ctrl-btn{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.95);box-shadow:0 10px 24px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:22px;color:#111}
+.ctrl-btn.pause{background:linear-gradient(135deg,#f39c12,#e67e22);color:#fff;width:76px;height:76px;font-size:26px}
+.ctrl-btn.stop{background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff}
+
+/* Arrival fade-in */
+#run-screen.arriving{animation:arriveFade .9s ease forwards}
+@keyframes arriveFade{
+  0%{opacity:0;transform:scale(1.08);filter:blur(8px)}
+  100%{opacity:1;transform:scale(1);filter:blur(0)}
+}
+
+.reset-btn{position:fixed;top:12px;right:12px;z-index:99;padding:6px 12px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;backdrop-filter:blur(10px)}
+</style>
+</head>
+<body>
+
+<!-- ====== 1) DETAIL ====== -->
+<section class="screen active" id="detail-screen">
+  <div class="detail-header">
+    <button class="back-btn">‹</button>
+    <span class="session-type-badge">Course facile</span>
+    <div style="width:40px"></div>
+  </div>
+  <div class="detail-title">Sortie endurance</div>
+  <div class="detail-sub">Construis ta base aérobie en douceur</div>
+
+  <div class="objective-row">
+    <div class="obj-card"><div class="val">5,0</div><div class="lbl">km</div></div>
+    <div class="obj-card"><div class="val">30'</div><div class="lbl">durée cible</div></div>
+    <div class="obj-card"><div class="val">6:00</div><div class="lbl">min/km</div></div>
+  </div>
+
+  <div class="weather-card">
+    <div class="icn">☀️</div>
+    <div class="main">
+      <div class="temp">12°</div>
+      <div class="desc">Ensoleillé — vent léger</div>
+    </div>
+    <div class="extra">Humidité 52%<br>Vent 8 km/h</div>
+  </div>
+
+  <div class="advice-card">
+    <h3>🎯 Conseils pour cette séance</h3>
+    <p>Course facile à effort conversationnel. Tu dois pouvoir parler sans être essoufflé. L'objectif n'est pas la vitesse, mais la régularité.</p>
+    <ul class="bullets">
+      <li>Échauffe-toi 5 min en marche rapide avant de partir</li>
+      <li>Garde une respiration fluide, 3 pas inspire / 2 pas expire</li>
+      <li>Termine en marche pour 5 min de récupération</li>
+    </ul>
+  </div>
+
+  <div class="advice-card">
+    <h3>📊 À quoi s'attendre</h3>
+    <p>Ta fréquence cardiaque devrait rester dans la zone 2 (environ 65-75% FCmax). Cette séance renforce ton système aérobie sans créer de fatigue.</p>
+  </div>
+
+  <div class="start-wrap"></div>
+  <button class="start-btn" id="start-btn">Commencer <span class="arrow">›</span></button>
+</section>
+
+<!-- ====== 2) GLOBE + CLOUDS ====== -->
+<section class="screen" id="globe-screen">
+  <canvas id="globe-canvas"></canvas>
+  <div class="atmo-glow" id="atmo-glow"></div>
+  <div class="speed-streaks" id="streaks"></div>
+  <div class="clouds-overlay" id="clouds"></div>
+  <div class="whiteout" id="whiteout"></div>
+  <div class="globe-location" id="loc-wrap">
+    <div class="where">Localisation</div>
+    <div class="name" id="loc-name">Recherche du signal GPS…</div>
+  </div>
+  <div class="globe-overlay" id="count-overlay"></div>
+</section>
+
+<!-- ====== 3) RUN ====== -->
+<section class="screen" id="run-screen">
+  <div id="run-map"></div>
+  <div class="run-top">
+    <div class="session">🏃 Sortie endurance · 5,0 km</div>
+    <div class="locked">🔒 GPS verrouillé</div>
+  </div>
+  <div class="run-stats">
+    <div class="main-stat">
+      <div class="val" id="stat-dist">0,00</div>
+      <div class="lbl">kilomètres</div>
+    </div>
+    <div class="sub-stats">
+      <div class="sub-stat"><div class="val" id="stat-time">00:00</div><div class="lbl">durée</div></div>
+      <div class="sub-stat"><div class="val" id="stat-pace">--:--</div><div class="lbl">allure</div></div>
+      <div class="sub-stat"><div class="val" id="stat-bpm">--</div><div class="lbl">bpm</div></div>
+    </div>
+  </div>
+  <div class="run-controls">
+    <button class="ctrl-btn stop">⏹</button>
+    <button class="ctrl-btn pause">⏸</button>
+    <button class="ctrl-btn">🔒</button>
+  </div>
+</section>
+
+<button class="reset-btn" onclick="location.reload()">↻ Rejouer</button>
+
+<script>
+/* ============================================================
+   Démo RunPacer — Plongée cinématique dans les nuages
+   Flux : détail → globe qui zoome → traversée des nuages →
+          flash blanc → arrivée sur la map Strava
+   ============================================================ */
+
+let userCoords = { lat: 45.5019, lon: -73.5674, name: "Montréal, QC" };
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function tryGeolocate(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      userCoords.lat = pos.coords.latitude;
+      userCoords.lon = pos.coords.longitude;
+      document.getElementById('loc-name').textContent = `${userCoords.lat.toFixed(3)}°, ${userCoords.lon.toFixed(3)}°`;
+    },
+    ()=>{},
+    { enableHighAccuracy:true, timeout:5000 }
+  );
+}
+
+document.getElementById('start-btn').addEventListener('click', ()=>{
+  tryGeolocate();
+  showScreen('globe-screen');
+  // Démarrer son de vent + animation
+  startWind();
+  requestAnimationFrame(()=>{
+    initGlobe();
+    runDivingSequence();
+  });
+});
+
+/* ==========================================================
+   SON DE VENT — AudioContext, bruit blanc filtré croissant
+   ========================================================== */
+let windCtx, windNoise, windGain, windFilter;
+function startWind(){
+  try{
+    windCtx = new (window.AudioContext||window.webkitAudioContext)();
+    // Bruit blanc via buffer
+    const size = 2 * windCtx.sampleRate;
+    const buf = windCtx.createBuffer(1, size, windCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<size;i++) data[i] = Math.random()*2-1;
+    windNoise = windCtx.createBufferSource();
+    windNoise.buffer = buf;
+    windNoise.loop = true;
+
+    windFilter = windCtx.createBiquadFilter();
+    windFilter.type = 'bandpass';
+    windFilter.frequency.value = 400;
+    windFilter.Q.value = 0.8;
+
+    windGain = windCtx.createGain();
+    windGain.gain.value = 0;
+
+    windNoise.connect(windFilter); windFilter.connect(windGain); windGain.connect(windCtx.destination);
+    windNoise.start();
+
+    // Rampe : silence → vent doux (0.5s) → vent fort pendant la plongée
+    const now = windCtx.currentTime;
+    windGain.gain.setValueAtTime(0, now);
+    windGain.gain.linearRampToValueAtTime(0.05, now + 1.5);
+    windGain.gain.linearRampToValueAtTime(0.25, now + 4.5);
+    windGain.gain.linearRampToValueAtTime(0.35, now + 6.2);
+    windGain.gain.linearRampToValueAtTime(0, now + 7.5);
+
+    // Le filtre monte en fréquence = sensation de vitesse
+    windFilter.frequency.setValueAtTime(300, now);
+    windFilter.frequency.linearRampToValueAtTime(1200, now + 6);
+  }catch(e){}
+}
+function stopWind(){
+  if(!windCtx) return;
+  try{ windNoise.stop(); windCtx.close(); }catch(e){}
+}
+
+/* ==========================================================
+   GLOBE THREE.JS
+   ========================================================== */
+let globeScene, globeCamera, globeRenderer, globeMesh, atmosphere, starfield, cloudSphere;
+let globeAnim = { running:false, phase:'idle', t0:0 };
+
+function initGlobe(){
+  if(globeScene) return;
+  const canvas = document.getElementById('globe-canvas');
+  const w = window.innerWidth, h = window.innerHeight;
+
+  globeScene = new THREE.Scene();
+  globeCamera = new THREE.PerspectiveCamera(45, w/h, 0.01, 1000);
+  globeCamera.position.set(0, 0, 3.2);
+
+  globeRenderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+  globeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  globeRenderer.setSize(w, h);
+
+  // Terre
+  const earthTex = makeEarthTexture();
+  const earthMat = new THREE.MeshPhongMaterial({ map: earthTex, shininess: 25, specular: new THREE.Color(0x333333) });
+  globeMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), earthMat);
+  globeScene.add(globeMesh);
+
+  // Couche de nuages 3D autour du globe (sphère légèrement + grande)
+  const cloudTex = makeCloudTexture();
+  const cloudMat = new THREE.MeshPhongMaterial({
+    map: cloudTex,
+    transparent:true,
+    opacity:.55,
+    depthWrite:false
+  });
+  cloudSphere = new THREE.Mesh(new THREE.SphereGeometry(1.015, 64, 64), cloudMat);
+  globeScene.add(cloudSphere);
+
+  // Atmosphère
+  const atmoGeom = new THREE.SphereGeometry(1.1, 64, 64);
+  const atmoMat = new THREE.ShaderMaterial({
+    vertexShader:`varying vec3 vNormal; void main(){ vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader:`varying vec3 vNormal; void main(){ float i = pow(0.7 - dot(vNormal, vec3(0,0,1.0)), 2.0); gl_FragColor = vec4(0.35, 0.7, 1.0, 1.0) * i; }`,
+    blending: THREE.AdditiveBlending, side: THREE.BackSide, transparent:true
+  });
+  atmosphere = new THREE.Mesh(atmoGeom, atmoMat);
+  globeScene.add(atmosphere);
+
+  // Étoiles
+  const stars = new THREE.BufferGeometry();
+  const starPos = [];
+  for(let i=0;i<1500;i++){
+    const r = 50 + Math.random()*40;
+    const t = Math.random()*Math.PI*2;
+    const p = Math.acos(2*Math.random()-1);
+    starPos.push(r*Math.sin(p)*Math.cos(t), r*Math.sin(p)*Math.sin(t), r*Math.cos(p));
+  }
+  stars.setAttribute('position', new THREE.Float32BufferAttribute(starPos,3));
+  starfield = new THREE.Points(stars, new THREE.PointsMaterial({ color:0xffffff, size:0.35, transparent:true, opacity:.7 }));
+  globeScene.add(starfield);
+
+  // Lumières
+  globeScene.add(new THREE.AmbientLight(0x666677, 1));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+  sun.position.set(5,3,5);
+  globeScene.add(sun);
+
+  globeAnim.running = true;
+  globeAnim.phase = 'idle';
+  animateGlobe();
+  window.addEventListener('resize', onGlobeResize);
+}
+
+function onGlobeResize(){
+  if(!globeRenderer) return;
+  const w = window.innerWidth, h = window.innerHeight;
+  globeCamera.aspect = w/h; globeCamera.updateProjectionMatrix();
+  globeRenderer.setSize(w, h);
+}
+
+function animateGlobe(){
+  if(!globeAnim.running) return;
+  requestAnimationFrame(animateGlobe);
+
+  // Rotation naturelle
+  if(globeAnim.phase==='idle' || globeAnim.phase==='approach'){
+    globeMesh.rotation.y += 0.0035;
+    cloudSphere.rotation.y += 0.0042;
+    starfield.rotation.y += 0.0005;
+  }
+
+  const now = performance.now();
+
+  if(globeAnim.phase === 'approach'){
+    // Phase 1 : aligner lon/lat + zoom depuis 3.2 vers ~1.15 (frôle les nuages)
+    const dur = 3500;
+    const t = Math.min(1, (now - globeAnim.t0) / dur);
+    const e = 1 - Math.pow(1-t, 3);
+
+    const targetRotY = -((userCoords.lon + 180) * Math.PI/180) - Math.PI/2;
+    const targetRotX = (userCoords.lat) * Math.PI/180;
+    globeMesh.rotation.y = lerpAngle(globeMesh.rotation.y, targetRotY, e*0.08);
+    globeMesh.rotation.x = lerp(globeMesh.rotation.x, targetRotX, e*0.1);
+    cloudSphere.rotation.y = globeMesh.rotation.y + 0.2;
+    cloudSphere.rotation.x = globeMesh.rotation.x;
+
+    globeCamera.position.z = lerp(3.2, 1.15, e);
+
+    if(t>=1){ globeAnim.phase = 'dive'; globeAnim.t0 = now; }
+  }
+  else if(globeAnim.phase === 'dive'){
+    // Phase 2 : traverser la couche nuageuse. La caméra entre DANS la sphère de nuages.
+    const dur = 1400;
+    const t = Math.min(1, (now - globeAnim.t0) / dur);
+    const e = t*t; // easeInQuad — accélère
+
+    globeCamera.position.z = lerp(1.15, 0.92, e); // On passe SOUS la couche de nuages (r=1.015)
+    // Augmenter l'opacité des nuages 3D et bloquer la vue
+    cloudSphere.material.opacity = lerp(.55, 1, e);
+
+    if(t>=1){ globeAnim.phase = 'whiteout'; globeAnim.t0 = now; }
+  }
+  else if(globeAnim.phase === 'whiteout'){
+    // Phase 3 : tout est blanc, on attend la transition vers la map
+  }
+
+  globeRenderer.render(globeScene, globeCamera);
+}
+
+function lerp(a,b,t){ return a + (b-a)*t }
+function lerpAngle(a,b,t){
+  let d = b - a;
+  while(d > Math.PI) d -= Math.PI*2;
+  while(d < -Math.PI) d += Math.PI*2;
+  return a + d*t;
+}
+
+/* Texture Terre */
+function makeEarthTexture(){
+  const c = document.createElement('canvas');
+  c.width = 2048; c.height = 1024;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0,0,0,c.height);
+  g.addColorStop(0,'#0a3a7a'); g.addColorStop(.5,'#1561b8'); g.addColorStop(1,'#0a3a7a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,c.width,c.height);
+
+  ctx.fillStyle = '#2d7a3e';
+  const continents = [
+    [[380,220],[520,200],[640,260],[700,330],[680,420],[560,480],[440,440],[360,360],[330,280]],
+    [[620,520],[700,540],[740,640],[700,780],[640,820],[580,720],[580,600]],
+    [[980,240],[1100,230],[1150,290],[1080,340],[990,320]],
+    [[1020,380],[1160,380],[1220,500],[1180,660],[1100,740],[1020,660],[990,500]],
+    [[1160,220],[1480,200],[1680,260],[1720,380],[1560,420],[1360,380],[1200,320]],
+    [[1460,400],[1580,400],[1640,480],[1560,520],[1480,470]],
+    [[1600,680],[1780,680],[1820,760],[1720,820],[1620,780]],
+  ];
+  continents.forEach(pts=>{
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for(let i=1;i<pts.length;i++){
+      const [x,y] = pts[i], [px,py] = pts[i-1];
+      const cx = (x+px)/2, cy = (y+py)/2;
+      ctx.quadraticCurveTo(px,py,cx,cy);
+    }
+    ctx.closePath(); ctx.fill();
+  });
+  ctx.fillStyle = 'rgba(255,255,255,.85)';
+  ctx.fillRect(0,0,c.width,60); ctx.fillRect(0,c.height-60,c.width,60);
+  const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; return tex;
+}
+
+/* Texture nuages — blobs blancs sur fond transparent */
+function makeCloudTexture(){
+  const c = document.createElement('canvas');
+  c.width = 2048; c.height = 1024;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  // Blobs de nuages
+  for(let i=0;i<80;i++){
+    const x = Math.random()*c.width;
+    const y = Math.random()*c.height;
+    const r = 30 + Math.random()*120;
+    const alpha = 0.35 + Math.random()*0.45;
+    const grad = ctx.createRadialGradient(x,y,0,x,y,r);
+    grad.addColorStop(0, `rgba(255,255,255,${alpha})`);
+    grad.addColorStop(.6, `rgba(255,255,255,${alpha*0.3})`);
+    grad.addColorStop(1, `rgba(255,255,255,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+  // Bandes nuageuses horizontales (équateur, tropiques)
+  for(let band of [200, 500, 820]){
+    for(let i=0;i<30;i++){
+      const x = Math.random()*c.width;
+      const y = band + (Math.random()-.5)*80;
+      const rx = 80 + Math.random()*150, ry = 25 + Math.random()*40;
+      const grad = ctx.createRadialGradient(x,y,0,x,y,rx);
+      grad.addColorStop(0, `rgba(255,255,255,.55)`);
+      grad.addColorStop(1, `rgba(255,255,255,0)`);
+      ctx.fillStyle = grad;
+      ctx.save(); ctx.translate(x,y); ctx.scale(1, ry/rx); ctx.translate(-x,-y);
+      ctx.beginPath(); ctx.arc(x,y,rx,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  return tex;
+}
+
+/* ==========================================================
+   NUAGES 2D EN OVERLAY — effet de traversée
+   Des gros puffs blancs qui grossissent vers la caméra
+   ========================================================== */
+function spawnCloudPuff(delay, fromScale, toScale, duration, x, y){
+  const el = document.createElement('div');
+  el.className = 'cloud-puff';
+  const size = 200 + Math.random()*200;
+  el.style.width = size+'px';
+  el.style.height = size+'px';
+  el.style.left = (x - size/2)+'px';
+  el.style.top = (y - size/2)+'px';
+  el.style.transform = `scale(${fromScale})`;
+  document.getElementById('clouds').appendChild(el);
+
+  setTimeout(()=>{
+    el.style.transition = `transform ${duration}ms cubic-bezier(.2,.6,.9,1), opacity ${duration}ms ease-out`;
+    el.style.transform = `scale(${toScale})`;
+    el.style.opacity = '1';
+    setTimeout(()=>{
+      el.style.opacity = '0';
+      setTimeout(()=>el.remove(), 600);
+    }, duration*0.7);
+  }, delay);
+}
+
+function burstClouds(){
+  // Apparition séquencée de puffs qui grossissent en venant vers l'écran
+  const w = window.innerWidth, h = window.innerHeight;
+  const positions = [
+    [w*0.3, h*0.4], [w*0.7, h*0.3], [w*0.5, h*0.55], [w*0.2, h*0.7],
+    [w*0.8, h*0.65], [w*0.4, h*0.25], [w*0.6, h*0.8], [w*0.5, h*0.5]
+  ];
+  positions.forEach(([x,y],i)=>{
+    spawnCloudPuff(i*110, 0.3, 5 + Math.random()*3, 1200 + Math.random()*400, x, y);
+  });
+  // Deuxième vague plus dense
+  setTimeout(()=>{
+    for(let i=0;i<10;i++){
+      spawnCloudPuff(i*60, 0.5, 7, 900, Math.random()*w, Math.random()*h);
+    }
+  }, 600);
+}
+
+/* ==========================================================
+   COUNTDOWN + SÉQUENCE COMPLÈTE
+   ========================================================== */
+function beep(freq=660, dur=120, vol=.15){
+  try{
+    const ctx = beep.ctx || (beep.ctx = new (window.AudioContext||window.webkitAudioContext)());
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = freq; o.type = 'sine'; g.gain.value = vol;
+    o.connect(g); g.connect(ctx.destination); o.start();
+    setTimeout(()=>o.stop(), dur);
+  }catch(e){}
+}
+function speak(text){
+  try{
+    if(!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'fr-FR'; u.rate = 1.05; speechSynthesis.speak(u);
+  }catch(e){}
+}
+function vibrate(p){ if(navigator.vibrate) navigator.vibrate(p); }
+
+function showBigNumber(text, isGo=false){
+  const overlay = document.getElementById('count-overlay');
+  overlay.innerHTML = '';
+  const el = document.createElement('div');
+  el.className = isGo ? 'go-text' : 'countdown-num';
+  el.textContent = text;
+  overlay.appendChild(el);
+}
+
+function runDivingSequence(){
+  // t=0 : globe visible et tourne. Attendre 1.2s pour laisser admirer
+  setTimeout(()=>{
+    // t=1.2s : démarrer la phase d'approche (zoom progressif + rotation vers GPS)
+    globeAnim.phase = 'approach';
+    globeAnim.t0 = performance.now();
+
+    // Streaks de vitesse apparaissent progressivement
+    const streaks = document.getElementById('streaks');
+    streaks.style.transition = 'opacity 2s ease';
+    streaks.style.opacity = '0.4';
+
+    // t=1.5s : "3"
+    setTimeout(()=>{
+      showBigNumber('3'); beep(660,140); vibrate(80); speak('Trois');
+    }, 300);
+
+    // t=2.5s : "2"
+    setTimeout(()=>{
+      showBigNumber('2'); beep(660,140); vibrate(80); speak('Deux');
+    }, 1300);
+
+    // t=3.5s : "1" + lueur atmosphérique commence
+    setTimeout(()=>{
+      showBigNumber('1'); beep(660,140); vibrate(80); speak('Un');
+      const atmo = document.getElementById('atmo-glow');
+      atmo.style.transition = 'opacity 1s ease';
+      atmo.style.opacity = '0.8';
+    }, 2300);
+
+    // t=4.5s : "GO" + burst de nuages 2D + vague sonore
+    setTimeout(()=>{
+      showBigNumber('GO', true);
+      beep(880, 280, .22);
+      vibrate([200, 80, 200]);
+      speak("C'est parti !");
+      document.getElementById('loc-wrap').style.opacity = '0';
+      burstClouds();
+    }, 3300);
+
+    // t=5.4s : white-out complet (on a traversé les nuages)
+    setTimeout(()=>{
+      const wo = document.getElementById('whiteout');
+      wo.style.transition = 'opacity 0.6s ease-in';
+      wo.style.opacity = '1';
+    }, 4700);
+
+    // t=6.0s : bascule vers la map Strava
+    setTimeout(()=>{
+      globeAnim.running = false;
+      showScreen('run-screen');
+      const runEl = document.getElementById('run-screen');
+      runEl.classList.add('arriving');
+      initRunMap();
+      startRunStats();
+      // Fade out du white-out par-dessus si visible
+      setTimeout(stopWind, 800);
+    }, 5300);
+
+  }, 1200);
+}
+
+/* ==========================================================
+   RUN SCREEN
+   ========================================================== */
+let runMap, runMarker, runPath, runPathLine;
+function initRunMap(){
+  if(runMap){ runMap.invalidateSize(); return; }
+  runMap = L.map('run-map', { zoomControl:false, attributionControl:false, dragging:true })
+    .setView([userCoords.lat, userCoords.lon], 17);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    maxZoom:20, subdomains:'abcd'
+  }).addTo(runMap);
+  const icon = L.divIcon({
+    className:'',
+    html:`<div style="width:22px;height:22px;border-radius:50%;background:#3498db;border:3px solid #fff;box-shadow:0 0 0 8px rgba(52,152,219,.25),0 0 20px rgba(52,152,219,.6)"></div>`,
+    iconSize:[22,22], iconAnchor:[11,11]
+  });
+  runMarker = L.marker([userCoords.lat, userCoords.lon],{icon}).addTo(runMap);
+  runPath = [[userCoords.lat, userCoords.lon]];
+  runPathLine = L.polyline(runPath, { color:'#3498db', weight:5, opacity:.85 }).addTo(runMap);
+}
+
+function startRunStats(){
+  let t0 = performance.now();
+  let dist = 0;
+  let lat = userCoords.lat, lon = userCoords.lon;
+  let heading = Math.random()*Math.PI*2;
+  setInterval(()=>{
+    const el = performance.now() - t0;
+    const mins = Math.floor(el/60000);
+    const secs = Math.floor((el%60000)/1000);
+    dist += 0.0028;
+    heading += (Math.random()-.5)*0.4;
+    lat += Math.cos(heading)*0.00003;
+    lon += Math.sin(heading)*0.00003;
+    runPath.push([lat,lon]);
+    runPathLine.setLatLngs(runPath);
+    runMarker.setLatLng([lat,lon]);
+    runMap.panTo([lat,lon],{animate:true,duration:1});
+    document.getElementById('stat-dist').textContent = dist.toFixed(2).replace('.',',');
+    document.getElementById('stat-time').textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    const paceMin = el/60000 / Math.max(dist,0.01);
+    const pm = Math.floor(paceMin), ps = Math.floor((paceMin-pm)*60);
+    document.getElementById('stat-pace').textContent = `${pm}:${String(ps).padStart(2,'0')}`;
+    document.getElementById('stat-bpm').textContent = Math.round(135 + Math.sin(el/4000)*8);
+  }, 1000);
+}
+
+tryGeolocate();
+</script>
+</body>
+</html>

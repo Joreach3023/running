@@ -1,6 +1,6 @@
 // RunPacer personal profile/progression bridge using the existing SwiftData snapshot.
-// Keeps the current web/localStorage behavior intact while making SwiftData the
-// authoritative backup for personal profile, XP and personal badges.
+// SwiftData owns the personal profile/progression state. localStorage remains a
+// temporary compatibility surface for the legacy web UI and write-through path.
 // Boss Run earned badges (`br_earned_badges`) remain outside this migration.
 
 (function (global) {
@@ -13,6 +13,7 @@
   const USER_KEY = 'runpacer_user_key';
   const PERSONAL_STATE_KEY = '__runPacerPersonalState';
   const PERSONAL_STATE_VERSION = 1;
+  const COMPATIBILITY_DEPTH_KEY = '__runPacerSwiftDataCompatibilityWriteDepth';
 
   const WATCHED_KEYS = new Set([USER_DATA_KEY, XP_KEY, BADGES_KEY, USER_KEY]);
   let syncTimer = null;
@@ -45,6 +46,22 @@
       return JSON.parse(JSON.stringify(value));
     } catch (_) {
       return fallback;
+    }
+  }
+
+  function compatibilityWriteInProgress() {
+    return Number(global[COMPATIBILITY_DEPTH_KEY] || 0) > 0;
+  }
+
+  function withCompatibilityWrite(callback) {
+    global[COMPATIBILITY_DEPTH_KEY] = Number(global[COMPATIBILITY_DEPTH_KEY] || 0) + 1;
+    try {
+      return callback();
+    } finally {
+      global[COMPATIBILITY_DEPTH_KEY] = Math.max(
+        0,
+        Number(global[COMPATIBILITY_DEPTH_KEY] || 1) - 1
+      );
     }
   }
 
@@ -114,61 +131,67 @@
       state.progression.userKey != null;
   }
 
-  function buildSnapshotUserData(existingUserData, legacyState) {
-    // Preserve the complete snapshot as a safety net for the migration while
-    // adding an isolated, versioned personal-state section.
-    const snapshotUserData = Object.assign(
-      {},
-      cloneJSON(existingUserData || {}, {}),
-      cloneJSON(legacyState.userData || {}, {})
-    );
-
+  function buildSnapshotUserData(existingUserData, profile, progression) {
+    // Preserve the old full snapshot as a frozen migration fallback. Only the
+    // isolated personal-state section is updated from now on.
+    const snapshotUserData = cloneJSON(existingUserData || {}, {});
     snapshotUserData[PERSONAL_STATE_KEY] = {
       version: PERSONAL_STATE_VERSION,
-      profile: legacyState.profile,
-      progression: legacyState.progression
+      profile: cloneJSON(profile || {}, {}),
+      progression: cloneJSON(progression || {}, {})
     };
-
     return snapshotUserData;
   }
 
-  async function syncPersonalStateFromLocalStorage() {
+  async function savePersonalState(profile, progression, legacyUserData) {
     const bridge = requireStorageBridge();
+    let existing = null;
+
+    try {
+      existing = await bridge.loadSnapshot();
+    } catch (_) {
+      // A missing old snapshot is fine; the dedicated state can create it.
+    }
+
+    const snapshotUserData = buildSnapshotUserData(
+      existing && existing.userData,
+      profile,
+      progression
+    );
+
+    await bridge.saveSnapshot({
+      userData: snapshotUserData,
+      trainingPlan: existing ? existing.trainingPlan : undefined,
+      deviceId: detectDeviceId(legacyUserData, existing)
+    });
+
+    return {
+      saved: true,
+      source: 'swiftdata',
+      profileKeys: Object.keys(profile || {}).length,
+      hasXP: progression && progression.xpRaw != null,
+      hasBadges: progression && progression.badgesRaw != null,
+      hasUserKey: progression && progression.userKey != null,
+      bossRunBadgesExcluded: true
+    };
+  }
+
+  async function syncPersonalStateFromLocalStorage() {
     const legacy = readLegacyPersonalState();
 
     if (!hasLegacyPersonalData(legacy)) {
       return { saved: false, reason: 'no-local-personal-state' };
     }
 
-    let existing = null;
-    try {
-      existing = await bridge.loadSnapshot();
-    } catch (_) {
-      // A missing/old snapshot must not block migration from the current local data.
-    }
+    const result = await savePersonalState(
+      legacy.profile,
+      legacy.progression,
+      legacy.userData
+    );
 
-    const snapshotUserData = buildSnapshotUserData(existing && existing.userData, legacy);
-    const trainingPlan = legacy.trainingPlan !== undefined
-      ? legacy.trainingPlan
-      : (existing ? existing.trainingPlan : undefined);
-
-    await bridge.saveSnapshot({
-      userData: snapshotUserData,
-      trainingPlan,
-      deviceId: detectDeviceId(legacy.userData, existing)
-    });
-
-    const result = {
-      saved: true,
-      source: 'localstorage',
-      profileKeys: Object.keys(legacy.profile).length,
-      hasXP: legacy.progression.xpRaw != null,
-      hasBadges: legacy.progression.badgesRaw != null,
-      hasUserKey: legacy.progression.userKey != null,
-      bossRunBadgesExcluded: true
-    };
-    console.log('[SwiftData] Profil/progression synchronisés:', result);
-    return result;
+    const syncResult = Object.assign({}, result, { source: 'localstorage-write-through' });
+    console.log('[SwiftData] Profil/progression synchronisés:', syncResult);
+    return syncResult;
   }
 
   async function loadPersonalState() {
@@ -221,10 +244,20 @@
   }
 
   function setLocalStorageIfChanged(key, value) {
-    if (value == null) return;
-    if (global.localStorage.getItem(key) !== String(value)) {
-      global.localStorage.setItem(key, String(value));
-    }
+    if (value == null) return false;
+    const text = String(value);
+    if (global.localStorage.getItem(key) === text) return false;
+    global.localStorage.setItem(key, text);
+    return true;
+  }
+
+  function setUserDataCompatibilityProfile(profile) {
+    const localUserData = readUserData() || {};
+    const mergedLocalUserData = Object.assign({}, localUserData, profile || {});
+    const nextJSON = JSON.stringify(mergedLocalUserData);
+    if (global.localStorage.getItem(USER_DATA_KEY) === nextJSON) return false;
+    global.localStorage.setItem(USER_DATA_KEY, nextJSON);
+    return true;
   }
 
   async function hydrateNow() {
@@ -250,16 +283,15 @@
       console.warn('[SwiftData] Profil runtime non mis à jour:', error);
     }
 
-    // Keep the legacy key hydrated for the existing app without touching the
-    // already-migrated runs/training plan arrays.
-    const localUserData = readUserData() || {};
-    const mergedLocalUserData = Object.assign({}, localUserData, profile);
-    global.localStorage.setItem(USER_DATA_KEY, JSON.stringify(mergedLocalUserData));
-
     const progression = state.progression || {};
-    setLocalStorageIfChanged(XP_KEY, progression.xpRaw);
-    setLocalStorageIfChanged(BADGES_KEY, progression.badgesRaw);
-    setLocalStorageIfChanged(USER_KEY, progression.userKey);
+    let compatibilityWrites = 0;
+
+    withCompatibilityWrite(function () {
+      if (setUserDataCompatibilityProfile(profile)) compatibilityWrites += 1;
+      if (setLocalStorageIfChanged(XP_KEY, progression.xpRaw)) compatibilityWrites += 1;
+      if (setLocalStorageIfChanged(BADGES_KEY, progression.badgesRaw)) compatibilityWrites += 1;
+      if (setLocalStorageIfChanged(USER_KEY, progression.userKey)) compatibilityWrites += 1;
+    });
 
     try {
       if (profile.currentPace != null) {
@@ -291,6 +323,7 @@
       hasXP: progression.xpRaw != null,
       hasBadges: progression.badgesRaw != null,
       runtimeUpdated,
+      compatibilityWrites,
       bossRunBadgesExcluded: true
     };
     console.log('[SwiftData] Profil/progression UI hydratés:', result);
@@ -317,7 +350,11 @@
     const previousSetItem = global.Storage.prototype.setItem;
     global.Storage.prototype.setItem = function (key, value) {
       const result = previousSetItem.apply(this, arguments);
-      if (this === global.localStorage && WATCHED_KEYS.has(key)) {
+      if (
+        this === global.localStorage &&
+        WATCHED_KEYS.has(key) &&
+        !compatibilityWriteInProgress()
+      ) {
         queueSync();
       }
       return result;
@@ -345,11 +382,13 @@
   }
 
   const bridge = global.RunPacerStorage || (global.RunPacerStorage = {});
+  bridge.savePersonalState = savePersonalState;
   bridge.loadPersonalState = loadPersonalState;
   bridge.syncPersonalStateFromLocalStorage = syncPersonalStateFromLocalStorage;
   bridge.initialPersonalStateImportIfNeeded = initialPersonalStateImportIfNeeded;
 
   global.RunPacerPersonalState = {
+    save: savePersonalState,
     load: loadPersonalState,
     syncNow: syncPersonalStateFromLocalStorage,
     initialImportIfNeeded: initialPersonalStateImportIfNeeded,

@@ -110,6 +110,8 @@ final class RunPacerDataStore {
     let cloudKitEnabled: Bool
     private(set) var persistenceFallbackReason: String?
 
+    private let personalStateKey = "__runPacerPersonalState"
+
     private init() {
         cloudKitEnabled = Bundle.main.object(forInfoDictionaryKey: "RunPacerCloudKitEnabled") as? Bool ?? false
 
@@ -251,6 +253,33 @@ final class RunPacerDataStore {
         return try container.mainContext.fetch(descriptor).first
     }
 
+    /// Preserve the dedicated personal-state section if an old compatibility
+    /// caller writes the legacy userData blob without that section.
+    private func preservingPersonalState(existingJSON: String?, incomingJSON: String) -> String {
+        guard
+            let existingJSON,
+            let existingData = existingJSON.data(using: .utf8),
+            let incomingData = incomingJSON.data(using: .utf8),
+            let existingObject = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any],
+            var incomingObject = try? JSONSerialization.jsonObject(with: incomingData) as? [String: Any],
+            let personalState = existingObject[personalStateKey],
+            incomingObject[personalStateKey] == nil
+        else {
+            return incomingJSON
+        }
+
+        incomingObject[personalStateKey] = personalState
+        guard
+            JSONSerialization.isValidJSONObject(incomingObject),
+            let mergedData = try? JSONSerialization.data(withJSONObject: incomingObject),
+            let mergedJSON = String(data: mergedData, encoding: .utf8)
+        else {
+            return incomingJSON
+        }
+
+        return mergedJSON
+    }
+
     func saveSnapshot(
         userDataJSON: String?,
         trainingPlanJSON: String?,
@@ -270,9 +299,20 @@ final class RunPacerDataStore {
             context.insert(snapshot)
         }
 
-        snapshot.userDataJSON = userDataJSON
-        snapshot.trainingPlanJSON = trainingPlanJSON
-        snapshot.deviceId = deviceId
+        // Missing values mean "leave unchanged". This prevents one bridge from
+        // erasing data owned by another dedicated SwiftData bridge.
+        if let userDataJSON {
+            snapshot.userDataJSON = preservingPersonalState(
+                existingJSON: snapshot.userDataJSON,
+                incomingJSON: userDataJSON
+            )
+        }
+        if let trainingPlanJSON {
+            snapshot.trainingPlanJSON = trainingPlanJSON
+        }
+        if let deviceId {
+            snapshot.deviceId = deviceId
+        }
         snapshot.updatedAt = Date()
         try context.save()
     }

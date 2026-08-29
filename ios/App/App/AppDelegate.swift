@@ -235,13 +235,28 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private let isoFormatter = ISO8601DateFormatter()
+    private let isoFormatterWithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private func parseISODate(_ value: String) -> Date? {
+        // RunPacer's historical `startTime` values include milliseconds, e.g.
+        // 2026-06-06T12:01:09.093Z. ISO8601DateFormatter's default options do
+        // not reliably parse fractional seconds, so try that format first.
+        if let parsed = isoFormatterWithFractionalSeconds.date(from: value) {
+            return parsed
+        }
+        return isoFormatter.date(from: value)
+    }
 
     private func date(from call: CAPPluginCall, key: String, fallback: Date = Date()) -> Date {
         if let timestamp = call.getDouble(key) {
             let seconds = timestamp > 10_000_000_000 ? timestamp / 1000 : timestamp
             return Date(timeIntervalSince1970: seconds)
         }
-        if let value = call.getString(key), let parsed = isoFormatter.date(from: value) {
+        if let value = call.getString(key), let parsed = parseISODate(value) {
             return parsed
         }
         return fallback

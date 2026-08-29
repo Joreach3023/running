@@ -210,8 +210,11 @@
     return result.runs || [];
   }
 
-  async function deleteRun(id) {
+  async function deleteRun(idOrOptions) {
     const plugin = await requirePlugin();
+    const id = typeof idOrOptions === 'string'
+      ? idOrOptions
+      : idOrOptions && idOrOptions.id;
     return plugin.deleteRun({ id });
   }
 

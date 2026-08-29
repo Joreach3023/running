@@ -6,6 +6,7 @@
 // - Store each run's complete payload directly on its SwiftData row.
 // - Read displayed personal history from SwiftData first; use the global
 //   snapshot only as a temporary fallback for pre-payload records.
+// - On startup, only import localStorage when SwiftData is empty/incomplete.
 // - Boss Runs, friends, invites and other shared/social data stay in Supabase.
 
 (function (global) {
@@ -233,8 +234,6 @@
     );
     if (exact !== -1) return exact;
 
-    // Fallback for very old records: use type + distance + duration if the
-    // detailed snapshot did not preserve a date field.
     const targetType = String(structuredRun.type || '');
     const targetDistance = distanceForRun(structuredRun);
     const targetDuration = durationForRun(structuredRun);
@@ -368,8 +367,6 @@
       };
     }
 
-    // Per-run payload is now the preferred detail source. Calls are parallel so
-    // even histories with many runs do not pay one bridge round-trip at a time.
     const payloadRuns = await Promise.all(structuredRuns.map(async (structuredRun) => {
       if (structuredRun.hasPayload === false) return null;
       try {
@@ -436,8 +433,6 @@
 
     const runs = Array.isArray(userData.runs) ? userData.runs : [];
 
-    // Keep the global snapshot during the transition. Each run below now also
-    // stores its own complete payload and is independently restorable.
     await saveSnapshot({
       userData,
       trainingPlan: Array.isArray(userData.trainingPlan) ? userData.trainingPlan : undefined,
@@ -459,6 +454,59 @@
     }
     const result = await syncUserData(userData);
     console.log('[SwiftData] Synchronisation personnelle terminée:', result.syncedRuns, 'course(s)');
+    return result;
+  }
+
+  async function initialImportIfNeeded() {
+    const localUserData = parseJSON(global.localStorage.getItem(USER_DATA_KEY), null);
+    const localRuns = localUserData && Array.isArray(localUserData.runs)
+      ? localUserData.runs
+      : [];
+
+    let nativeRuns;
+    try {
+      nativeRuns = await listRuns();
+    } catch (error) {
+      console.warn('[SwiftData] Vérification de démarrage impossible; aucune réécriture locale:',
+        error && error.message ? error.message : error);
+      return {
+        imported: false,
+        reason: 'native-list-failed',
+        error: error && error.message ? error.message : String(error)
+      };
+    }
+
+    if (nativeRuns.length > 0 && nativeRuns.length >= localRuns.length) {
+      const result = {
+        imported: false,
+        reason: 'swiftdata-already-populated',
+        nativeRuns: nativeRuns.length,
+        localRuns: localRuns.length
+      };
+      console.log('[SwiftData] Démarrage SwiftData-first:', result);
+      return result;
+    }
+
+    if (!localUserData || localRuns.length === 0) {
+      const result = {
+        imported: false,
+        reason: 'no-local-history-to-import',
+        nativeRuns: nativeRuns.length,
+        localRuns: localRuns.length
+      };
+      console.log('[SwiftData] Démarrage sans import local:', result);
+      return result;
+    }
+
+    const syncResult = await syncUserData(localUserData);
+    const result = {
+      imported: true,
+      reason: nativeRuns.length === 0 ? 'swiftdata-empty' : 'swiftdata-incomplete',
+      nativeRunsBefore: nativeRuns.length,
+      localRuns: localRuns.length,
+      syncedRuns: syncResult.syncedRuns
+    };
+    console.log('[SwiftData] Import local de sécurité effectué:', result);
     return result;
   }
 
@@ -492,7 +540,12 @@
     installLocalStorageMirror();
 
     global.setTimeout(function () {
-      queueSync();
+      syncInFlight = syncInFlight
+        .then(initialImportIfNeeded)
+        .catch(function (error) {
+          console.warn('[SwiftData] Vérification initiale ignorée:',
+            error && error.message ? error.message : error);
+        });
     }, 750);
   }
 
@@ -507,6 +560,7 @@
     loadHistory,
     syncUserData,
     syncFromLocalStorage,
+    initialImportIfNeeded,
     syncNow: syncFromLocalStorage
   };
 

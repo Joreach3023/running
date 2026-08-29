@@ -22,6 +22,11 @@ final class RunPacerStoredRun {
     var notes: String?
     var createdAt: Date = Date()
 
+    /// Complete legacy/future run payload. This keeps GPS points, splits,
+    /// route images, pace and fields that are not worth freezing into the
+    /// SwiftData/CloudKit schema yet.
+    var payloadJSON: String?
+
     init(
         id: UUID = UUID(),
         name: String = "Course",
@@ -31,7 +36,8 @@ final class RunPacerStoredRun {
         type: String = "Run",
         source: String = "runpacer",
         notes: String? = nil,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        payloadJSON: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -42,12 +48,13 @@ final class RunPacerStoredRun {
         self.source = source
         self.notes = notes
         self.createdAt = createdAt
+        self.payloadJSON = payloadJSON
     }
 }
 
 /// Flexible snapshot used for the existing Supabase `user_backups` payloads.
-/// Keeping the complex user/training-plan structures as JSON avoids freezing a
-/// large CloudKit schema before those structures are fully stabilized.
+/// It remains as a migration/fallback safety net while per-run payloads become
+/// the primary detailed storage representation.
 @available(iOS 17.0, *)
 @Model
 final class RunPacerUserSnapshot {
@@ -129,7 +136,8 @@ final class RunPacerDataStore {
         type: String,
         source: String,
         notes: String?,
-        createdAt: Date
+        createdAt: Date,
+        payloadJSON: String?
     ) throws {
         let context = container.mainContext
         let runId = id
@@ -146,6 +154,12 @@ final class RunPacerDataStore {
             existing.source = source
             existing.notes = notes
             existing.createdAt = createdAt
+
+            // An old/simplified caller must never erase details that were
+            // already migrated into the per-run payload.
+            if let payloadJSON {
+                existing.payloadJSON = payloadJSON
+            }
         } else {
             context.insert(
                 RunPacerStoredRun(
@@ -157,7 +171,8 @@ final class RunPacerDataStore {
                     type: type,
                     source: source,
                     notes: notes,
-                    createdAt: createdAt
+                    createdAt: createdAt,
+                    payloadJSON: payloadJSON
                 )
             )
         }
@@ -169,6 +184,14 @@ final class RunPacerDataStore {
         var descriptor = FetchDescriptor<RunPacerStoredRun>()
         descriptor.sortBy = [SortDescriptor(\RunPacerStoredRun.date, order: .reverse)]
         return try container.mainContext.fetch(descriptor)
+    }
+
+    func loadRunPayload(id: UUID) throws -> String? {
+        let runId = id
+        let descriptor = FetchDescriptor<RunPacerStoredRun>(
+            predicate: #Predicate { $0.id == runId }
+        )
+        return try container.mainContext.fetch(descriptor).first?.payloadJSON
     }
 
     func deleteRun(id: UUID) throws -> Bool {
@@ -229,6 +252,7 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveRun", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "listRuns", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "loadRunPayload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "deleteRun", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveSnapshot", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "loadSnapshot", returnType: CAPPluginReturnPromise)
@@ -288,6 +312,7 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
         let type = call.getString("type") ?? "Run"
         let source = call.getString("source") ?? "runpacer"
         let notes = call.getString("notes")
+        let payloadJSON = call.getString("payloadJson")
         let runDate = date(from: call, key: "date")
         let createdAt = date(from: call, key: "createdAt", fallback: runDate)
 
@@ -302,7 +327,8 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
                     type: type,
                     source: source,
                     notes: notes,
-                    createdAt: createdAt
+                    createdAt: createdAt,
+                    payloadJSON: payloadJSON
                 )
                 call.resolve(["id": id.uuidString])
             } catch {
@@ -324,12 +350,32 @@ public class RunPacerStoragePlugin: CAPPlugin, CAPBridgedPlugin {
                         "type": run.type,
                         "source": run.source,
                         "notes": run.notes ?? "",
-                        "createdAt": isoFormatter.string(from: run.createdAt)
+                        "createdAt": isoFormatter.string(from: run.createdAt),
+                        "hasPayload": !(run.payloadJSON?.isEmpty ?? true)
                     ]
                 }
                 call.resolve(["runs": runs])
             } catch {
                 call.reject("Unable to load runs", nil, error)
+            }
+        }
+    }
+
+    @objc public func loadRunPayload(_ call: CAPPluginCall) {
+        guard let idString = call.getString("id"), let id = UUID(uuidString: idString) else {
+            call.reject("A valid run id is required")
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                let payloadJSON = try RunPacerDataStore.shared.loadRunPayload(id: id)
+                call.resolve([
+                    "exists": payloadJSON != nil,
+                    "payloadJson": payloadJSON ?? ""
+                ])
+            } catch {
+                call.reject("Unable to load run payload", nil, error)
             }
         }
     }

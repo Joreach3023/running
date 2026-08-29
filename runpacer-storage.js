@@ -58,16 +58,78 @@
   }
 
   function normalizeDateValue(value) {
-    if (!value) return null;
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return value + 'T12:00:00Z';
+    if (value == null || value === '') return null;
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const ms = value > 100000000000 ? value : value * 1000;
+      const numericDate = new Date(ms);
+      return Number.isNaN(numericDate.getTime()) ? null : numericDate.toISOString();
     }
-    return value;
+
+    if (typeof value !== 'string') return null;
+    let text = value.trim();
+    if (!text) return null;
+
+    // Historical RunPacer records often stored only YYYY-MM-DD.
+    // Noon UTC prevents timezone conversion from shifting the calendar day.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      return text + 'T12:00:00Z';
+    }
+
+    // Accept Postgres-style timestamps as well as regular ISO timestamps.
+    // Example: 2026-06-06 12:50:35.394446+00
+    if (/^\d{4}-\d{2}-\d{2}\s/.test(text)) {
+      text = text.replace(' ', 'T');
+      text = text.replace(/\.(\d{3})\d+/, '.$1');
+      text = text.replace(/\+00$/, 'Z');
+    }
+
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+  }
+
+  function dateCandidatesForRun(run) {
+    return [
+      run && run.startTime,
+      run && run.start_time,
+      run && run.date,
+      run && run.runDate,
+      run && run.run_date,
+      run && run.createdAt,
+      run && run.created_at,
+      run && run.timestamp
+    ];
   }
 
   function dateForRun(run) {
-    const value = run.startTime || run.createdAt || run.created_at || run.date;
-    return normalizeDateValue(value) || new Date().toISOString();
+    for (const candidate of dateCandidatesForRun(run || {})) {
+      const normalized = normalizeDateValue(candidate);
+      if (normalized) return normalized;
+    }
+
+    const fallback = new Date().toISOString();
+    console.warn('[SwiftData] Date historique introuvable; utilisation de la date actuelle pour:', {
+      name: nameForRun(run || {}),
+      distanceKm: distanceForRun(run || {}),
+      durationSecs: durationForRun(run || {})
+    });
+    return fallback;
+  }
+
+  function createdAtForRun(run, runDate) {
+    const candidates = [
+      run && run.createdAt,
+      run && run.created_at,
+      run && run.startTime,
+      run && run.start_time,
+      run && run.date
+    ];
+    for (const candidate of candidates) {
+      const normalized = normalizeDateValue(candidate);
+      if (normalized) return normalized;
+    }
+    return runDate;
   }
 
   function nameForRun(run) {
@@ -78,7 +140,7 @@
     // Old RunPacer runs did not always have an ID. These fields are stable enough
     // to identify the same historical run across repeated localStorage writes.
     return JSON.stringify([
-      run.startTime || run.createdAt || run.created_at || run.date || '',
+      run.startTime || run.start_time || run.createdAt || run.created_at || run.date || '',
       run.type || run.typeName || run.type_name || '',
       String(distanceForRun(run)),
       String(durationForRun(run)),
@@ -138,7 +200,7 @@
       type: (run && (run.type || run.typeName)) || 'Run',
       source: (run && run.source) || 'runpacer',
       notes: (run && run.notes) || undefined,
-      createdAt: normalizeDateValue(run && (run.createdAt || run.created_at || run.startTime || run.date)) || runDate
+      createdAt: createdAtForRun(run || {}, runDate)
     });
   }
 

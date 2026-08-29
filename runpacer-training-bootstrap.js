@@ -1,11 +1,12 @@
 // RunPacer SwiftData-first training-plan bootstrap.
 // Hydrates the legacy `userData.trainingPlan` + localStorage key so the current
-// web UI keeps working unchanged while SwiftData becomes authoritative.
+// web UI keeps working unchanged while SwiftData remains authoritative.
 
 (function (global) {
   'use strict';
 
   const PLAN_KEY = 'runPacerTrainingPlan';
+  const COMPATIBILITY_DEPTH_KEY = '__runPacerSwiftDataCompatibilityWriteDepth';
   let hydrationInFlight = null;
 
   function parseJSON(value, fallback) {
@@ -25,6 +26,18 @@
     return Array.isArray(plan) ? plan.length : (plan == null ? 0 : 1);
   }
 
+  function withCompatibilityWrite(callback) {
+    global[COMPATIBILITY_DEPTH_KEY] = Number(global[COMPATIBILITY_DEPTH_KEY] || 0) + 1;
+    try {
+      return callback();
+    } finally {
+      global[COMPATIBILITY_DEPTH_KEY] = Math.max(
+        0,
+        Number(global[COMPATIBILITY_DEPTH_KEY] || 1) - 1
+      );
+    }
+  }
+
   function applyPlanToLegacyApp(plan) {
     let runtimeUpdated = false;
 
@@ -37,7 +50,14 @@
       console.warn('[SwiftData] Impossible de mettre à jour userData.trainingPlan:', error);
     }
 
-    global.localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
+    const nextJSON = JSON.stringify(plan);
+    let compatibilityWrite = false;
+    if (global.localStorage.getItem(PLAN_KEY) !== nextJSON) {
+      withCompatibilityWrite(function () {
+        global.localStorage.setItem(PLAN_KEY, nextJSON);
+      });
+      compatibilityWrite = true;
+    }
 
     try {
       if (typeof updateTrainingPlanDisplay === 'function') {
@@ -47,7 +67,7 @@
       console.warn('[SwiftData] Rafraîchissement visuel du plan ignoré:', error);
     }
 
-    return runtimeUpdated;
+    return { runtimeUpdated, compatibilityWrite };
   }
 
   async function hydrateNow() {
@@ -83,12 +103,13 @@
         return { hydrated: false, reason: 'no-training-plan' };
       }
 
-      const runtimeUpdated = applyPlanToLegacyApp(plan);
+      const applied = applyPlanToLegacyApp(plan);
       const summary = {
         hydrated: true,
         source,
         items: itemCount(plan),
-        runtimeUpdated
+        runtimeUpdated: applied.runtimeUpdated,
+        compatibilityWrite: applied.compatibilityWrite
       };
       console.log('[SwiftData] Plan UI hydraté:', summary);
       return summary;

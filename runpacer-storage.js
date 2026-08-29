@@ -2,11 +2,12 @@
 //
 // Transition strategy:
 // - Keep the current web app/localStorage/Supabase behavior untouched.
-// - Mirror personal runs and the complete user snapshot into SwiftData.
+// - Keep personal runs mirrored into dedicated SwiftData rows.
 // - Store each run's complete payload directly on its SwiftData row.
-// - Read displayed personal history from SwiftData first; use the global
-//   snapshot only as a temporary fallback for pre-payload records.
-// - On startup, only import localStorage when SwiftData is empty/incomplete.
+// - Read displayed personal history from SwiftData first; use the old global
+//   snapshot only as a frozen migration fallback for pre-payload records.
+// - Do not let ordinary legacy userData writes redefine the snapshot anymore.
+// - On startup, only import local history when SwiftData is empty/incomplete.
 // - Boss Runs, friends, invites and other shared/social data stay in Supabase.
 
 (function (global) {
@@ -411,39 +412,25 @@
     };
   }
 
-  function detectDeviceId(userData) {
-    if (userData && userData.deviceId) return String(userData.deviceId);
-    const candidates = [
-      'device_id',
-      'deviceId',
-      'runPacerDeviceId',
-      'runpacer_device_id'
-    ];
-    for (const key of candidates) {
-      const value = global.localStorage.getItem(key);
-      if (value) return value;
-    }
-    return undefined;
-  }
-
   async function syncUserData(userData) {
     if (!userData || typeof userData !== 'object') {
       return { syncedRuns: 0, snapshotSaved: false };
     }
 
+    // Runs still use localStorage as a temporary write-through adapter because
+    // the legacy web app writes its whole userData object. The global snapshot
+    // is deliberately NOT rewritten here anymore; profile and plan have their
+    // own SwiftData-first bridges.
     const runs = Array.isArray(userData.runs) ? userData.runs : [];
-
-    await saveSnapshot({
-      userData,
-      trainingPlan: Array.isArray(userData.trainingPlan) ? userData.trainingPlan : undefined,
-      deviceId: detectDeviceId(userData)
-    });
-
     for (const run of runs) {
       await saveRun(run);
     }
 
-    return { syncedRuns: runs.length, snapshotSaved: true };
+    return {
+      syncedRuns: runs.length,
+      snapshotSaved: false,
+      sourceOfTruth: 'dedicated-swiftdata-records'
+    };
   }
 
   async function syncFromLocalStorage() {
@@ -453,7 +440,7 @@
       return { syncedRuns: 0, snapshotSaved: false, reason: 'no-local-user-data' };
     }
     const result = await syncUserData(userData);
-    console.log('[SwiftData] Synchronisation personnelle terminée:', result.syncedRuns, 'course(s)');
+    console.log('[SwiftData] Synchronisation des courses terminée:', result.syncedRuns, 'course(s)');
     return result;
   }
 

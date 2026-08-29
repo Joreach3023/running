@@ -4,6 +4,8 @@
 // - Keep the current web app/localStorage/Supabase behavior untouched.
 // - Mirror personal runs and the complete user snapshot into SwiftData.
 // - Use stable UUIDs so repeated syncs never duplicate a run.
+// - Read the displayed personal history from SwiftData first, while preserving
+//   GPS/splits/route details from the SwiftData snapshot.
 // - Boss Runs, friends, invites and other shared/social data stay in Supabase.
 
 (function (global) {
@@ -70,14 +72,10 @@
     let text = value.trim();
     if (!text) return null;
 
-    // Historical RunPacer records often stored only YYYY-MM-DD.
-    // Noon UTC prevents timezone conversion from shifting the calendar day.
     if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
       return text + 'T12:00:00Z';
     }
 
-    // Accept Postgres-style timestamps as well as regular ISO timestamps.
-    // Example: 2026-06-06 12:50:35.394446+00
     if (/^\d{4}-\d{2}-\d{2}\s/.test(text)) {
       text = text.replace(' ', 'T');
       text = text.replace(/\.(\d{3})\d+/, '.$1');
@@ -102,11 +100,17 @@
     ];
   }
 
-  function dateForRun(run) {
+  function normalizedDateForRun(run) {
     for (const candidate of dateCandidatesForRun(run || {})) {
       const normalized = normalizeDateValue(candidate);
       if (normalized) return normalized;
     }
+    return null;
+  }
+
+  function dateForRun(run) {
+    const normalized = normalizedDateForRun(run);
+    if (normalized) return normalized;
 
     const fallback = new Date().toISOString();
     console.warn('[SwiftData] Date historique introuvable; utilisation de la date actuelle pour:', {
@@ -137,8 +141,6 @@
   }
 
   function fingerprintRun(run) {
-    // Old RunPacer runs did not always have an ID. These fields are stable enough
-    // to identify the same historical run across repeated localStorage writes.
     return JSON.stringify([
       run.startTime || run.start_time || run.createdAt || run.created_at || run.date || '',
       run.type || run.typeName || run.type_name || '',
@@ -174,12 +176,89 @@
   }
 
   function fallbackUUID() {
-    // RFC4122 v4 fallback for older WebKit contexts.
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = Math.random() * 16 | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
     });
+  }
+
+  function paceFromRun(distanceKm, durationSecs) {
+    if (!(distanceKm > 0) || !(durationSecs > 0)) return '--:--';
+    const secondsPerKm = durationSecs / distanceKm;
+    const minutes = Math.floor(secondsPerKm / 60);
+    const seconds = Math.round(secondsPerKm % 60);
+    const normalizedMinutes = seconds === 60 ? minutes + 1 : minutes;
+    const normalizedSeconds = seconds === 60 ? 0 : seconds;
+    return `${normalizedMinutes}:${String(normalizedSeconds).padStart(2, '0')}`;
+  }
+
+  function calendarDay(value) {
+    const normalized = normalizeDateValue(value);
+    return normalized ? normalized.slice(0, 10) : '';
+  }
+
+  function historyMatchKey(run) {
+    return [
+      calendarDay(normalizedDateForRun(run)),
+      String((run && (run.type || run.typeName || run.type_name)) || ''),
+      distanceForRun(run).toFixed(3),
+      String(durationForRun(run))
+    ].join('|');
+  }
+
+  function findDetailedRun(structuredRun, detailRuns, usedIndexes) {
+    const structuredId = structuredRun && structuredRun.id;
+    if (structuredId) {
+      const byId = detailRuns.findIndex((run, index) =>
+        !usedIndexes.has(index) &&
+        (run.id === structuredId || run.swiftDataId === structuredId || run.swift_data_id === structuredId)
+      );
+      if (byId !== -1) return byId;
+    }
+
+    const structuredKey = historyMatchKey(structuredRun || {});
+    const exact = detailRuns.findIndex((run, index) =>
+      !usedIndexes.has(index) && historyMatchKey(run) === structuredKey
+    );
+    if (exact !== -1) return exact;
+
+    // Fallback for very old records: use type + distance + duration if the
+    // detailed snapshot did not preserve a date field.
+    const targetType = String(structuredRun.type || '');
+    const targetDistance = distanceForRun(structuredRun);
+    const targetDuration = durationForRun(structuredRun);
+    return detailRuns.findIndex((run, index) =>
+      !usedIndexes.has(index) &&
+      String(run.type || run.typeName || run.type_name || '') === targetType &&
+      Math.abs(distanceForRun(run) - targetDistance) < 0.001 &&
+      durationForRun(run) === targetDuration
+    );
+  }
+
+  function mergeHistoryRun(structuredRun, detailedRun) {
+    const merged = detailedRun ? Object.assign({}, detailedRun) : {};
+    const dateISO = normalizeDateValue(structuredRun.date) || new Date().toISOString();
+    const distanceKm = distanceForRun(structuredRun);
+    const durationSecs = durationForRun(structuredRun);
+
+    merged.id = structuredRun.id;
+    merged.swiftDataId = structuredRun.id;
+    merged.name = structuredRun.name || merged.name || merged.typeName || 'Course';
+    merged.typeName = merged.typeName || structuredRun.name || merged.name || 'Course';
+    merged.type = structuredRun.type || merged.type || 'Run';
+    merged.distanceKm = distanceKm;
+    merged.distance = distanceKm.toFixed(2);
+    merged.durationSecs = durationSecs;
+    merged.duration = durationSecs;
+    merged.date = dateISO.slice(0, 10);
+    merged.startTime = merged.startTime || dateISO;
+    merged.createdAt = structuredRun.createdAt || merged.createdAt || dateISO;
+    merged.source = structuredRun.source || merged.source || 'runpacer';
+    merged.notes = structuredRun.notes || merged.notes || '';
+    merged.pace = merged.pace || paceFromRun(distanceKm, durationSecs);
+
+    return merged;
   }
 
   async function status() {
@@ -240,6 +319,49 @@
     };
   }
 
+  async function loadHistory() {
+    const structuredRuns = await listRuns();
+    let snapshot = null;
+    try {
+      snapshot = await loadSnapshot();
+    } catch (error) {
+      console.warn('[SwiftData] Snapshot détaillé indisponible:', error && error.message ? error.message : error);
+    }
+
+    const snapshotRuns = snapshot && snapshot.userData && Array.isArray(snapshot.userData.runs)
+      ? snapshot.userData.runs
+      : [];
+
+    if (!structuredRuns.length) {
+      const localUserData = parseJSON(global.localStorage.getItem(USER_DATA_KEY), null);
+      const fallbackRuns = snapshotRuns.length
+        ? snapshotRuns
+        : (localUserData && Array.isArray(localUserData.runs) ? localUserData.runs : []);
+      return {
+        source: snapshotRuns.length ? 'swiftdata-snapshot-fallback' : 'localstorage-fallback',
+        runs: fallbackRuns,
+        structuredCount: 0,
+        detailedCount: snapshotRuns.length
+      };
+    }
+
+    const usedIndexes = new Set();
+    const runs = structuredRuns.map((structuredRun) => {
+      const detailIndex = findDetailedRun(structuredRun, snapshotRuns, usedIndexes);
+      const detailedRun = detailIndex >= 0 ? snapshotRuns[detailIndex] : null;
+      if (detailIndex >= 0) usedIndexes.add(detailIndex);
+      return mergeHistoryRun(structuredRun, detailedRun);
+    });
+
+    return {
+      source: 'swiftdata',
+      runs,
+      structuredCount: structuredRuns.length,
+      detailedCount: snapshotRuns.length,
+      detailedMatches: usedIndexes.size
+    };
+  }
+
   function detectDeviceId(userData) {
     if (userData && userData.deviceId) return String(userData.deviceId);
     const candidates = [
@@ -262,8 +384,6 @@
 
     const runs = Array.isArray(userData.runs) ? userData.runs : [];
 
-    // Save the complete payload first. This preserves GPS points, splits,
-    // route images and any fields not yet represented by the SwiftData Run model.
     await saveSnapshot({
       userData,
       trainingPlan: Array.isArray(userData.trainingPlan) ? userData.trainingPlan : undefined,
@@ -317,8 +437,6 @@
   function startAutomaticSync() {
     installLocalStorageMirror();
 
-    // Give Capacitor and the app's own startup logic a moment to initialize,
-    // then import the existing local history once. Re-running is idempotent.
     global.setTimeout(function () {
       queueSync();
     }, 750);
@@ -331,6 +449,7 @@
     deleteRun,
     saveSnapshot,
     loadSnapshot,
+    loadHistory,
     syncUserData,
     syncFromLocalStorage,
     syncNow: syncFromLocalStorage

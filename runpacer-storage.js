@@ -57,8 +57,17 @@
     ));
   }
 
+  function normalizeDateValue(value) {
+    if (!value) return null;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value + 'T12:00:00Z';
+    }
+    return value;
+  }
+
   function dateForRun(run) {
-    return run.startTime || run.createdAt || run.created_at || run.date || new Date().toISOString();
+    const value = run.startTime || run.createdAt || run.created_at || run.date;
+    return normalizeDateValue(value) || new Date().toISOString();
   }
 
   function nameForRun(run) {
@@ -119,16 +128,17 @@
   async function saveRun(run) {
     const plugin = await requirePlugin();
     const id = stableRunId(run || {});
+    const runDate = dateForRun(run || {});
     return plugin.saveRun({
       id,
       name: nameForRun(run || {}),
       distanceKm: distanceForRun(run || {}),
       durationSecs: durationForRun(run || {}),
-      date: dateForRun(run || {}),
+      date: runDate,
       type: (run && (run.type || run.typeName)) || 'Run',
       source: (run && run.source) || 'runpacer',
       notes: (run && run.notes) || undefined,
-      createdAt: (run && (run.createdAt || run.created_at || run.startTime || run.date)) || new Date().toISOString()
+      createdAt: normalizeDateValue(run && (run.createdAt || run.created_at || run.startTime || run.date)) || runDate
     });
   }
 

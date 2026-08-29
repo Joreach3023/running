@@ -3,9 +3,9 @@
 // Transition strategy:
 // - Keep the current web app/localStorage/Supabase behavior untouched.
 // - Mirror personal runs and the complete user snapshot into SwiftData.
-// - Use stable UUIDs so repeated syncs never duplicate a run.
-// - Read the displayed personal history from SwiftData first, while preserving
-//   GPS/splits/route details from the SwiftData snapshot.
+// - Store each run's complete payload directly on its SwiftData row.
+// - Read displayed personal history from SwiftData first; use the global
+//   snapshot only as a temporary fallback for pre-payload records.
 // - Boss Runs, friends, invites and other shared/social data stay in Supabase.
 
 (function (global) {
@@ -39,6 +39,16 @@
       return JSON.parse(value);
     } catch (_) {
       return fallback;
+    }
+  }
+
+  function payloadJSONForRun(run) {
+    try {
+      return JSON.stringify(run || {});
+    } catch (error) {
+      console.warn('[SwiftData] Payload de course non sérialisable; détails conservés via snapshot:',
+        error && error.message ? error.message : error);
+      return null;
     }
   }
 
@@ -270,6 +280,7 @@
     const plugin = await requirePlugin();
     const id = stableRunId(run || {});
     const runDate = dateForRun(run || {});
+    const payloadJson = payloadJSONForRun(run || {});
     return plugin.saveRun({
       id,
       name: nameForRun(run || {}),
@@ -279,7 +290,8 @@
       type: (run && (run.type || run.typeName)) || 'Run',
       source: (run && run.source) || 'runpacer',
       notes: (run && run.notes) || undefined,
-      createdAt: createdAtForRun(run || {}, runDate)
+      createdAt: createdAtForRun(run || {}, runDate),
+      payloadJson: payloadJson || undefined
     });
   }
 
@@ -287,6 +299,13 @@
     const plugin = await requirePlugin();
     const result = await plugin.listRuns();
     return result.runs || [];
+  }
+
+  async function loadRunPayload(id) {
+    const plugin = await requirePlugin();
+    const result = await plugin.loadRunPayload({ id });
+    if (!result || !result.exists || !result.payloadJson) return null;
+    return parseJSON(result.payloadJson, null);
   }
 
   async function deleteRun(idOrOptions) {
@@ -322,6 +341,7 @@
   async function loadHistory() {
     const structuredRuns = await listRuns();
     let snapshot = null;
+
     try {
       snapshot = await loadSnapshot();
     } catch (error) {
@@ -341,15 +361,44 @@
         source: snapshotRuns.length ? 'swiftdata-snapshot-fallback' : 'localstorage-fallback',
         runs: fallbackRuns,
         structuredCount: 0,
+        perRunPayloadMatches: 0,
+        snapshotFallbackMatches: snapshotRuns.length,
+        detailedMatches: snapshotRuns.length,
         detailedCount: snapshotRuns.length
       };
     }
 
-    const usedIndexes = new Set();
-    const runs = structuredRuns.map((structuredRun) => {
-      const detailIndex = findDetailedRun(structuredRun, snapshotRuns, usedIndexes);
-      const detailedRun = detailIndex >= 0 ? snapshotRuns[detailIndex] : null;
-      if (detailIndex >= 0) usedIndexes.add(detailIndex);
+    // Per-run payload is now the preferred detail source. Calls are parallel so
+    // even histories with many runs do not pay one bridge round-trip at a time.
+    const payloadRuns = await Promise.all(structuredRuns.map(async (structuredRun) => {
+      if (structuredRun.hasPayload === false) return null;
+      try {
+        return await loadRunPayload(structuredRun.id);
+      } catch (error) {
+        console.warn('[SwiftData] Payload individuel indisponible pour', structuredRun.id,
+          error && error.message ? error.message : error);
+        return null;
+      }
+    }));
+
+    const usedSnapshotIndexes = new Set();
+    let perRunPayloadMatches = 0;
+    let snapshotFallbackMatches = 0;
+
+    const runs = structuredRuns.map((structuredRun, index) => {
+      let detailedRun = payloadRuns[index];
+
+      if (detailedRun) {
+        perRunPayloadMatches += 1;
+      } else {
+        const detailIndex = findDetailedRun(structuredRun, snapshotRuns, usedSnapshotIndexes);
+        detailedRun = detailIndex >= 0 ? snapshotRuns[detailIndex] : null;
+        if (detailIndex >= 0) {
+          usedSnapshotIndexes.add(detailIndex);
+          snapshotFallbackMatches += 1;
+        }
+      }
+
       return mergeHistoryRun(structuredRun, detailedRun);
     });
 
@@ -357,8 +406,11 @@
       source: 'swiftdata',
       runs,
       structuredCount: structuredRuns.length,
-      detailedCount: snapshotRuns.length,
-      detailedMatches: usedIndexes.size
+      perRunPayloadMatches,
+      snapshotFallbackMatches,
+      snapshotCount: snapshotRuns.length,
+      detailedMatches: perRunPayloadMatches + snapshotFallbackMatches,
+      detailedCount: perRunPayloadMatches + snapshotFallbackMatches
     };
   }
 
@@ -384,6 +436,8 @@
 
     const runs = Array.isArray(userData.runs) ? userData.runs : [];
 
+    // Keep the global snapshot during the transition. Each run below now also
+    // stores its own complete payload and is independently restorable.
     await saveSnapshot({
       userData,
       trainingPlan: Array.isArray(userData.trainingPlan) ? userData.trainingPlan : undefined,
@@ -446,6 +500,7 @@
     status,
     saveRun,
     listRuns,
+    loadRunPayload,
     deleteRun,
     saveSnapshot,
     loadSnapshot,

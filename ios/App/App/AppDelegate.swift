@@ -2,6 +2,11 @@ import UIKit
 import Capacitor
 import SwiftData
 
+// Capacitor/UIKit exposes a non-generic KeyPath symbol in this target. SwiftData's
+// @Model macro expects the generic Swift standard-library KeyPath type, so make
+// that resolution explicit at module scope.
+typealias KeyPath<Root, Value> = Swift.KeyPath<Root, Value>
+
 // MARK: - SwiftData personal models (iOS 17+)
 
 @available(iOS 17.0, *)

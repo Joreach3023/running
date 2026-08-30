@@ -1,13 +1,13 @@
 // RunPacer native personal-storage bridge (Capacitor 7 / iOS 17+)
 //
-// Transition strategy:
-// - Keep the current web app/localStorage/Supabase behavior untouched.
-// - Keep personal runs mirrored into dedicated SwiftData rows.
-// - Store each run's complete payload directly on its SwiftData row.
-// - Read displayed personal history from SwiftData first; use the old global
-//   snapshot only as a frozen migration fallback for pre-payload records.
-// - Do not let ordinary legacy userData writes redefine the snapshot anymore.
-// - On startup, only import local history when SwiftData is empty/incomplete.
+// SwiftData-first strategy:
+// - Personal runs are written directly to dedicated SwiftData rows.
+// - Each run keeps its complete payload on its SwiftData row.
+// - Displayed personal history reads from SwiftData first; the old global
+//   snapshot remains only as a frozen migration fallback for pre-payload rows.
+// - Ordinary localStorage userData writes no longer mirror runs automatically.
+// - A manual sync/import path remains available as a recovery tool for legacy
+//   installations where SwiftData is empty or incomplete.
 // - Boss Runs, friends, invites and other shared/social data stay in Supabase.
 
 (function (global) {
@@ -17,9 +17,7 @@
   const RUN_ID_MAP_KEY = 'runPacerSwiftDataRunIds';
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-  let syncTimer = null;
   let syncInFlight = Promise.resolve();
-  let storageHookInstalled = false;
 
   function nativePlugin() {
     return global.Capacitor &&
@@ -412,15 +410,13 @@
     };
   }
 
+  // Manual legacy recovery path. This is intentionally not connected to
+  // Storage.prototype.setItem anymore.
   async function syncUserData(userData) {
     if (!userData || typeof userData !== 'object') {
       return { syncedRuns: 0, snapshotSaved: false };
     }
 
-    // Runs still use localStorage as a temporary write-through adapter because
-    // the legacy web app writes its whole userData object. The global snapshot
-    // is deliberately NOT rewritten here anymore; profile and plan have their
-    // own SwiftData-first bridges.
     const runs = Array.isArray(userData.runs) ? userData.runs : [];
     for (const run of runs) {
       await saveRun(run);
@@ -429,7 +425,8 @@
     return {
       syncedRuns: runs.length,
       snapshotSaved: false,
-      sourceOfTruth: 'dedicated-swiftdata-records'
+      sourceOfTruth: 'swiftdata-direct',
+      automaticMirror: false
     };
   }
 
@@ -437,10 +434,15 @@
     const raw = global.localStorage.getItem(USER_DATA_KEY);
     const userData = parseJSON(raw, null);
     if (!userData) {
-      return { syncedRuns: 0, snapshotSaved: false, reason: 'no-local-user-data' };
+      return {
+        syncedRuns: 0,
+        snapshotSaved: false,
+        automaticMirror: false,
+        reason: 'no-local-user-data'
+      };
     }
     const result = await syncUserData(userData);
-    console.log('[SwiftData] Synchronisation des courses terminée:', result.syncedRuns, 'course(s)');
+    console.log('[SwiftData] Récupération manuelle des courses terminée:', result.syncedRuns, 'course(s)');
     return result;
   }
 
@@ -458,6 +460,7 @@
         error && error.message ? error.message : error);
       return {
         imported: false,
+        automaticMirror: false,
         reason: 'native-list-failed',
         error: error && error.message ? error.message : String(error)
       };
@@ -466,17 +469,19 @@
     if (nativeRuns.length > 0 && nativeRuns.length >= localRuns.length) {
       const result = {
         imported: false,
+        automaticMirror: false,
         reason: 'swiftdata-already-populated',
         nativeRuns: nativeRuns.length,
         localRuns: localRuns.length
       };
-      console.log('[SwiftData] Démarrage SwiftData-first:', result);
+      console.log('[SwiftData] Démarrage SwiftData-first sans miroir automatique:', result);
       return result;
     }
 
     if (!localUserData || localRuns.length === 0) {
       const result = {
         imported: false,
+        automaticMirror: false,
         reason: 'no-local-history-to-import',
         nativeRuns: nativeRuns.length,
         localRuns: localRuns.length
@@ -488,44 +493,17 @@
     const syncResult = await syncUserData(localUserData);
     const result = {
       imported: true,
+      automaticMirror: false,
       reason: nativeRuns.length === 0 ? 'swiftdata-empty' : 'swiftdata-incomplete',
       nativeRunsBefore: nativeRuns.length,
       localRuns: localRuns.length,
       syncedRuns: syncResult.syncedRuns
     };
-    console.log('[SwiftData] Import local de sécurité effectué:', result);
+    console.log('[SwiftData] Import local de récupération effectué:', result);
     return result;
   }
 
-  function queueSync() {
-    if (syncTimer) global.clearTimeout(syncTimer);
-    syncTimer = global.setTimeout(function () {
-      syncTimer = null;
-      syncInFlight = syncInFlight
-        .then(syncFromLocalStorage)
-        .catch(function (error) {
-          console.warn('[SwiftData] Synchronisation différée:', error && error.message ? error.message : error);
-        });
-    }, 100);
-  }
-
-  function installLocalStorageMirror() {
-    if (storageHookInstalled || !global.Storage || !global.localStorage) return;
-    storageHookInstalled = true;
-
-    const originalSetItem = global.Storage.prototype.setItem;
-    global.Storage.prototype.setItem = function (key, value) {
-      const result = originalSetItem.apply(this, arguments);
-      if (this === global.localStorage && key === USER_DATA_KEY) {
-        queueSync();
-      }
-      return result;
-    };
-  }
-
-  function startAutomaticSync() {
-    installLocalStorageMirror();
-
+  function startRecoveryCheck() {
     global.setTimeout(function () {
       syncInFlight = syncInFlight
         .then(initialImportIfNeeded)
@@ -548,8 +526,9 @@
     syncUserData,
     syncFromLocalStorage,
     initialImportIfNeeded,
-    syncNow: syncFromLocalStorage
+    syncNow: syncFromLocalStorage,
+    automaticRunMirrorEnabled: false
   };
 
-  startAutomaticSync();
+  startRecoveryCheck();
 })(window);

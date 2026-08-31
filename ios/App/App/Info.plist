@@ -47,7 +47,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Cette application utilise votre position pour suivre vos courses.</string>
 	<key>RunPacerCloudKitEnabled</key>
-	<false/>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

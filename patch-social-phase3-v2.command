@@ -15,32 +15,33 @@ if [ ! -f "$PHASE3" ]; then
 fi
 
 python3 - "$INDEX" <<'PY'
-import pathlib, shutil, sys
+import pathlib, re, shutil, sys
 from datetime import datetime
 
 path = pathlib.Path(sys.argv[1])
 text = path.read_text(encoding='utf-8')
-changes=[]
 
-# Phase 3 replaces this function with the complete robust implementation.
-# Some local Capacitor/Xcode rebuilds can restore an older index.html that no
-# longer contains the function injected by the previous Boss Run patch.
-if 'window.rpLoadBossInvites' not in text:
+# Cherche une VRAIE définition de fonction, pas seulement une référence au nom.
+pattern = re.compile(r"window\.rpLoadBossInvites\s*=\s*(?:async\s+)?function\s*\([^)]*\)\s*\{")
+
+if not pattern.search(text):
     stamp=datetime.now().strftime('%Y%m%d_%H%M%S')
     backup=path.with_name(f'index.html.backup_phase3_prereq_{stamp}')
     shutil.copy2(path,backup)
+
     stub='''\n<script>\n/* RunPacer phase3 prerequisite hook */\nwindow.rpLoadBossInvites = async function(){};\n</script>\n'''
+
     if '</body>' in text:
         text=text.replace('</body>',stub+'\n</body>',1)
     else:
         text += stub
+
     path.write_text(text,encoding='utf-8')
-    changes.append('boss-invite-inbox-hook-restored')
     print('Pré-requis phase 3 réparé.')
-    print('-',changes[0])
+    print('- boss-invite-inbox-hook-restored')
     print('Backup:',backup)
 else:
-    print('Pré-requis phase 3 déjà présent.')
+    print('Pré-requis phase 3 déjà présent et valide.')
 PY
 
 echo "Lancement de patch-social-phase3.command…"

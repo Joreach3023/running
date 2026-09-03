@@ -46,6 +46,8 @@
 	<string>Cette application utilise votre position même en arrière-plan pour suivre vos courses.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Cette application utilise votre position pour suivre vos courses.</string>
+	<key>RunPacerCloudKitEnabled</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

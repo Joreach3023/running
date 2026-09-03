@@ -11,7 +11,6 @@ fi
 
 python3 - "$INDEX" <<'PY'
 import pathlib
-import re
 import shutil
 import sys
 from datetime import datetime
@@ -33,12 +32,11 @@ if old in text:
 elif new not in text:
     raise SystemExit("ERREUR: création de profil onboarding non reconnue.")
 
-# 2) Social profile editor: update existing profile; create only if none exists.
-pattern = re.compile(
-    r"window\.rpSaveProfile = async function\(\) \{.*?\n\s*\};\n\n\s*window\.rpEditProfile = function\(\) \{",
-    re.S,
-)
-replacement = r'''window.rpSaveProfile = async function() {
+# 2) Social profile editor: replace everything between two stable function markers.
+# This intentionally does not depend on whether the old function ends with `}` or `};`.
+start_marker = "window.rpSaveProfile = async function() {"
+next_marker = "window.rpEditProfile = function() {"
+replacement = '''window.rpSaveProfile = async function() {
             const username = document.getElementById('rp-username-input')?.value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
             const errEl    = document.getElementById('rp-profile-error');
             const btn      = document.getElementById('rp-profile-save-btn');
@@ -86,12 +84,14 @@ replacement = r'''window.rpSaveProfile = async function() {
             }
         };
 
-        window.rpEditProfile = function() {'''
-text, count = pattern.subn(replacement, text, count=1)
-if count == 1:
+        '''
+if "Enregistrement…" not in text:
+    start = text.find(start_marker)
+    end = text.find(next_marker, start + len(start_marker)) if start >= 0 else -1
+    if start < 0 or end < 0 or end <= start:
+        raise SystemExit("ERREUR: bloc rpSaveProfile non reconnu.")
+    text = text[:start] + replacement + text[end:]
     changes.append("single-profile-editor")
-elif "Enregistrement…" not in text:
-    raise SystemExit("ERREUR: bloc rpSaveProfile non reconnu.")
 
 # 3) Friend query: include the canonical public progression fields.
 old_select = "profiles!profile_id_a(id,username,avatar,badges), profiles!profile_id_b(id,username,avatar,badges)"
@@ -106,11 +106,11 @@ elif new_select not in text:
 needle = '<div class="rp-friend-name">@${p.username}</div>'
 insert = '''<div class="rp-friend-name">@${p.username}</div>
                             <div class="rp-friend-sub">Niv. ${p.xp_level || 1} · ${p.xp_grade || 'Marcheur'} · ${Number(p.total_xp || 0).toFixed(1)} XP · ${Number(p.total_km || 0).toFixed(1)} km</div>'''
-if needle in text:
+if "Number(p.total_xp || 0)" not in text:
+    if needle not in text:
+        raise SystemExit("ERREUR: carte ami non reconnue.")
     text = text.replace(needle, insert, 1)
     changes.append("friend-progression-ui")
-elif "Number(p.total_xp || 0)" not in text:
-    raise SystemExit("ERREUR: carte ami non reconnue.")
 
 # 5) Own profile stats: prefer server summary so the social profile and feed agree.
 old_stats = '''const runs = JSON.parse(localStorage.getItem('runPacerUserData') || '{}').runs || [];
@@ -122,11 +122,11 @@ new_stats = '''const recentCount = Array.isArray(rpMyProfile.recent_runs) ? rpMy
                 const grade = rpMyProfile.xp_grade || 'Marcheur';
                 const xp = Number(rpMyProfile.total_xp || 0);
                 stEl.textContent = `Niv. ${level} · ${grade} · ${xp.toFixed(1)} XP · ${totalKm.toFixed(1)} km${recentCount ? ` · ${recentCount} récentes` : ''}`;'''
-if old_stats in text:
+if "Niv. ${level}" not in text:
+    if old_stats not in text:
+        raise SystemExit("ERREUR: statistiques du profil local non reconnues.")
     text = text.replace(old_stats, new_stats, 1)
     changes.append("own-profile-server-stats")
-elif "Niv. ${level}" not in text:
-    raise SystemExit("ERREUR: statistiques du profil local non reconnues.")
 
 path.write_text(text, encoding="utf-8")
 print("Patch social profil appliqué.")
